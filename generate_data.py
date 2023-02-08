@@ -14,7 +14,7 @@ import helper as hp
 
 
 # project directory
-PROJECT_DIR = '/home/jonathan/Documents/diss/synthetic_data'
+PROJECT_DIR = '/home/jonathan/Documents/diss/intuitive_physics'
 
 # frame rate parameters PyBullet
 PB_FPS = 240
