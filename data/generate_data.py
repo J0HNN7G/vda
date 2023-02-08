@@ -72,7 +72,7 @@ def get_parser():
                 description="Simulate top-down synthetic pool ball collision videos")
 
     parser.add_argument("--data-folder", default='data',
-                        help = "folder where all data is saved")
+                        help = "folder where all data is saved (default: 'data')")
 
     parser.add_argument("--sim-name", default='sample',
                         help = "simulation folder prefix in data folder (default: 'sample')")
