@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import pybullet as pb
 import numpy as np
 import pandas as pd
@@ -225,7 +227,7 @@ def initialize_directory(data_folder, sim_name):
         video_fp = os.path.join(PROJECT_DIR, data_folder, sim_name) + f'_{i}'
         i += 1
     try:
-        os.mkdir(video_fp)
+        os.makedirs(video_fp)
     except OSError as error:
         print(f"Directory '{video_fp}' cannot be created")
         exit()
