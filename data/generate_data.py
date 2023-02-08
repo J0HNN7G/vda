@@ -105,6 +105,12 @@ def get_parser():
     parser.add_argument("--num-balls", type=int, default=3,
                         help="number of balls in simulation (default: 3)")
 
+    parser.add_argument("--same-vis", action='store_true', default=False,
+                        help="keep the appearance same for all balls (default: False)")
+
+    parser.add_argument("--same-phys", action='store_true', default=False,
+                        help="keep the physics same for all balls (default: False)")
+
     parser.add_argument("--rand-seed", type=int, default=42,
                         help = "random seed for numpy (default=42)")
 
@@ -128,7 +134,7 @@ def initialize_simulator(use_gui):
     physicsClient = pb.connect(sim_mode)
 
 
-def initialize_environment():
+def initialize_environment(data_folder):
     """Create environment"""
     world_filepath = os.path.join(PROJECT_DIR, 'world')
     plane_filepath = os.path.join(world_filepath, 'plane', 'plane.urdf')
@@ -151,14 +157,24 @@ def initialize_environment():
     return env_id_dict
 
 
-def initialize_balls(num_balls):
+def initialize_balls(num_balls, same_phys, same_vis):
     """Create balls"""
 
     # randomized ball properties
-    ballColors = BALL_COLOR_OPT[np.random.choice(len(BALL_COLOR_OPT), num_balls)]
-    ballRadi = INC_RAD + np.random.randint(int(MAX_RAD / INC_RAD), size=num_balls) * INC_RAD
-    ballMass = INC_MASS + np.random.randint(int(MAX_MASS / INC_MASS), size=num_balls) * INC_MASS
-    ballFriction = np.power(10.0, np.random.randint(low=MIN_FRIC_EXP, high=MAX_FRIC_EXP, size=num_balls))
+    if same_phys:
+        ballMass = [INC_MASS + np.random.randint(int(MAX_MASS / INC_MASS)) * INC_MASS] * num_balls
+        ballFriction = [np.power(10.0, np.random.randint(low=MIN_FRIC_EXP, high=MAX_FRIC_EXP))] * num_balls
+    else:
+        ballMass = INC_MASS + np.random.randint(int(MAX_MASS / INC_MASS), size=num_balls) * INC_MASS
+        ballFriction = np.power(10.0, np.random.randint(low=MIN_FRIC_EXP, high=MAX_FRIC_EXP, size=num_balls))
+
+    if same_vis:
+        ballRadi = [INC_RAD + np.random.randint(int(MAX_RAD / INC_RAD)) * INC_RAD] * num_balls
+        ballColors = [BALL_COLOR_OPT[np.random.choice(len(BALL_COLOR_OPT))]] * num_balls
+    else:
+        ballRadi = INC_RAD + np.random.randint(int(MAX_RAD / INC_RAD), size=num_balls) * INC_RAD
+        ballColors = BALL_COLOR_OPT[np.random.choice(len(BALL_COLOR_OPT), num_balls)]
+
     ballInitLinVel = [ newScale(np.append(np.random.rand(2), 0), newMin=-MAX_ABS_VEL, newMax=MAX_ABS_VEL) for _ in range(num_balls)]
     ballInitAngVel = [[0,0,0]] * num_balls
 
@@ -216,10 +232,10 @@ def initialize_directory(data_folder, sim_name):
     return video_fp
 
 
-def save_simulation_info(video_fp, json_prefix, ballColors, ballRadi, ballMass, ballFriction):
+def save_simulation_info(video_fp, json_prefix, des_fps, num_balls, ballColors, ballRadi, ballMass, ballFriction):
     # saving object properties
     objects_info_filepath = os.path.join(video_fp, json_prefix + '.json')
-    objects_info = {}
+    objects_info = {'fps' : des_fps, 'num_balls' : num_balls}
     for i in range(num_balls):
         objects_info[i]  = {
         'color' : list(ballColors[i]),
@@ -240,14 +256,14 @@ def save_ball_infos(video_fp, csv_prefix, num_balls, ball_sim_values):
         df.to_csv(ball_csv_filepath)
 
 
-def run_simulation(data_folder, sim_name, img_prefix, img_type, csv_prefix, json_prefix, use_gui, use_render, des_fps, duration, num_balls):
+def run_simulation(data_folder, sim_name, img_prefix, img_type, csv_prefix, json_prefix, use_gui, use_render, des_fps, duration, num_balls, same_phys, same_vis):
     initialize_simulator(use_gui)
 
-    env_id_dict = initialize_environment()
-    ballIds, ballColors, ballRadi, ballMass, ballFriction = initialize_balls(num_balls)
+    env_id_dict = initialize_environment(data_folder)
+    ballIds, ballColors, ballRadi, ballMass, ballFriction = initialize_balls(num_balls, same_phys, same_vis)
     video_fp = initialize_directory(data_folder, sim_name)
 
-    save_simulation_info(video_fp, json_prefix, ballColors, ballRadi, ballMass, ballFriction)
+    save_simulation_info(video_fp, json_prefix, des_fps, num_balls, ballColors, ballRadi, ballMass, ballFriction)
 
 
     # desired total number of timesteps
@@ -286,7 +302,7 @@ def run_simulation(data_folder, sim_name, img_prefix, img_type, csv_prefix, json
                                                                         lightDirection=[0, 0, 4])
                 # save image
                 im = Image.fromarray(rgbImg)
-                img_name = f"{img_prefix}{timestep}{img_type}"
+                img_name = f"{img_prefix}{curr_num_des_frames}{img_type}"
                 img_filepath = os.path.join(video_fp, img_name)
                 im.save(img_filepath)
 
@@ -322,6 +338,8 @@ if __name__ == "__main__":
     des_fps = args.fps
     duration = args.duration
     num_balls = args.num_balls
+    same_phys = args.same_phys
+    same_vis = args.same_vis
 
     np.random.seed(args.rand_seed)
 
@@ -330,4 +348,4 @@ if __name__ == "__main__":
                        img_prefix, img_type,
                        csv_prefix, json_prefix,
                        use_gui, use_render,
-                       des_fps, duration, num_balls)
+                       des_fps, duration, num_balls, same_phys, same_vis)
