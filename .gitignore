@@ -2,7 +2,9 @@
 # Edit at https://www.toptal.com/developers/gitignore?templates=visualstudiocode,python,ros,c++
 
 ### Personal ###
-data/*
+data/diff_vis_diff_phys/*
+data/same_vis_diff_phys/*
+data/same_vis_same_phys/*
 model/*
 
 

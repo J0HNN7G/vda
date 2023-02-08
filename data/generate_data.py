@@ -10,8 +10,6 @@ import csv
 import json
 import argparse
 
-import helper as hp
-
 
 # project directory
 PROJECT_DIR = '/home/jonathan/Documents/diss/intuitive_physics'
@@ -113,8 +111,16 @@ def get_parser():
     return parser
 
 
+def newScale(oldValue, oldMin=0, oldMax=1, newMin=-1, newMax=1):
+    """Change value to different linear scale"""
+    oldRange = (oldMax - oldMin)
+    newRange = (newMax - newMin)
+    newValue = (((oldValue - oldMin) * newRange) / oldRange) + newMin
+    return newValue
+
+
 def initialize_simulator(use_gui):
-    """initialize PyBullet"""
+    """Initialize PyBullet"""
     if use_gui:
         sim_mode = pb.GUI
     else:
@@ -153,7 +159,7 @@ def initialize_balls(num_balls):
     ballRadi = INC_RAD + np.random.randint(int(MAX_RAD / INC_RAD), size=num_balls) * INC_RAD
     ballMass = INC_MASS + np.random.randint(int(MAX_MASS / INC_MASS), size=num_balls) * INC_MASS
     ballFriction = np.power(10.0, np.random.randint(low=MIN_FRIC_EXP, high=MAX_FRIC_EXP, size=num_balls))
-    ballInitLinVel = [ hp.newScale(np.append(np.random.rand(2), 0), newMin=-MAX_ABS_VEL, newMax=MAX_ABS_VEL) for _ in range(num_balls)]
+    ballInitLinVel = [ newScale(np.append(np.random.rand(2), 0), newMin=-MAX_ABS_VEL, newMax=MAX_ABS_VEL) for _ in range(num_balls)]
     ballInitAngVel = [[0,0,0]] * num_balls
 
     # create balls in simulation
@@ -164,8 +170,8 @@ def initialize_balls(num_balls):
         allSafePos = False
         while not allSafePos:
             # new position guaranteed not to overlap with walls
-            initPos = np.array([hp.newScale(np.random.rand(), newMin=WORLD_X_MIN+ballRadi[i], newMax=WORLD_X_MAX-ballRadi[i]),
-                                hp.newScale(np.random.rand(), newMin=WORLD_Y_MIN+ballRadi[i], newMax=WORLD_Y_MAX-ballRadi[i]),
+            initPos = np.array([newScale(np.random.rand(), newMin=WORLD_X_MIN+ballRadi[i], newMax=WORLD_X_MAX-ballRadi[i]),
+                                newScale(np.random.rand(), newMin=WORLD_Y_MIN+ballRadi[i], newMax=WORLD_Y_MAX-ballRadi[i]),
                                 ballRadi[i]+0.01])
             # check if overlaps with other balls
             isSafePos = True
