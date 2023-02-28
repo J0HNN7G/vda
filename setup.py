@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 import setuptools
 
 with open('README.md', 'r') as fh:
@@ -19,9 +20,11 @@ setuptools.setup(
     ),
     install_requires=[
         'numpy',
-        'pandas',
-        'Pillow',
         'pybullet',
+        'torch',
+        'torchvision',
+        'Pillow',
+        'pandas',
         'tqdm'
     ]
 )

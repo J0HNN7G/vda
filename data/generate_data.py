@@ -1,5 +1,4 @@
 # -*- coding: utf-8 -*-
-
 import pybullet as pb
 import numpy as np
 import pandas as pd
@@ -8,7 +7,6 @@ from tqdm import tqdm
 
 import os
 import time
-import csv
 import json
 import argparse
 
@@ -255,7 +253,7 @@ def save_ball_infos(video_fp, csv_prefix, num_balls, ball_sim_values):
         df = pd.DataFrame(ball_sim_values[i, :, :].T, columns=BALL_SIM_COL_NAMES)
         csv_name = f"{csv_prefix}{i}.csv"
         ball_csv_filepath = os.path.join(video_fp, csv_name)
-        df.to_csv(ball_csv_filepath)
+        df.to_csv(ball_csv_filepath, index=False)
 
 
 def run_simulation(data_folder, sim_name, img_prefix, img_type, csv_prefix, json_prefix, use_gui, use_render, des_fps, duration, num_balls, same_phys, same_vis):
