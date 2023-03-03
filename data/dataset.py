@@ -28,7 +28,8 @@ def extract_integer(filename):
 
 
 class BaseDataset(torch.utils.data.Dataset):
-    def __init__(self, data_fp, img_size, buffer_size, info_prefix='info', ball_csv_prefix='ball_', img_prefix='timestep_', **kwargs):
+    def __init__(self, data_fp, img_size, buffer_size, info_prefix='info', ball_csv_prefix='ball_',
+                 img_prefix='timestep_', **kwargs):
         self.data_fp = data_fp
         self.img_size = img_size
         self.buffer_size = buffer_size
@@ -62,23 +63,23 @@ class BaseDataset(torch.utils.data.Dataset):
 
         if max_sample > 0:
             self.list_sample = self.list_sample[0:max_sample]
-        if start_idx >= 0 and end_idx >= 0:     # divide file list
+        if start_idx >= 0 and end_idx >= 0:  # divide file list
             self.list_sample = self.list_sample[start_idx:end_idx]
 
         self.num_sample = len(self.list_sample)
         assert self.num_sample > 0
 
-        self.list_buffer_sample = [self.list_sample[i:i+self.buffer_size]
-                                   for i in range(self.num_sample-self.buffer_size+1)]
+        self.list_buffer_sample = [self.list_sample[i:i + self.buffer_size]
+                                   for i in range(self.num_sample - self.buffer_size + 1)]
 
-        #print('# individual frames: {}'.format(self.num_sample))
-        #print('# buffer samples: {}'.format(self.num_sample - self.buffer_size))
+        # print('# individual frames: {}'.format(self.num_sample))
+        # print('# buffer samples: {}'.format(self.num_sample - self.buffer_size))
 
     def img_transform(self, img):
         # 0-255 to 0-1
         img = np.float32(np.array(img)) / 255.
         img = img.transpose((2, 0, 1))
-        #img = self.normalize(torch.from_numpy(img.copy()))
+        # img = self.normalize(torch.from_numpy(img.copy()))
         img = torch.from_numpy(img.copy())
         return img
 
@@ -101,7 +102,6 @@ class SingleDataset(BaseDataset):
             self.cur_idx = 0
             np.random.shuffle(self.list_sample)
 
-
         with open(self.data_info_fp) as f:
             data_info = json.load(f)
         ball_csvs = [pd.read_csv(fp, index_col=0) for fp in self.ball_csv_fps]
@@ -114,7 +114,7 @@ class SingleDataset(BaseDataset):
             # load image and label
             image_path = os.path.join(self.data_fp, record_img_fn)
             img = Image.open(image_path).convert('RGB')
-            if not ( (img.width == self.img_size[0]) and (img.height == self.img_size[1])):
+            if not ((img.width == self.img_size[0]) and (img.height == self.img_size[1])):
                 img = img_resize(img, (self.img_size[0], self.img_size[1]), interp='bilinear')
             # image transform, to torch float tensor 3xHxW
             img = self.img_transform(img)
@@ -122,7 +122,7 @@ class SingleDataset(BaseDataset):
             # put into batch arrays
             batch_images[i][:, :img.shape[1], :img.shape[2]] = img
 
-            record_idx = int(record_img_fn[-(1+len('.png'))])
+            record_idx = int(record_img_fn[-(1 + len('.png'))])
             for j in range(self.num_balls):
                 record_state = list(ball_csvs[0].iloc[record_idx][[0, 1, 7, 8]]) + [data_info[str(j)]['mass']] + [
                     data_info[str(j)]['friction']]
@@ -138,7 +138,7 @@ class SingleDataset(BaseDataset):
 
 
 class MultiDataset(torch.utils.data.Dataset):
-    def __init__(self, data_fps, img_size, buffer_size, random_order = False, **kwargs):
+    def __init__(self, data_fps, img_size, buffer_size, random_order=False, **kwargs):
         self.datasets = []
         for data_fp in data_fps:
             self.datasets.append(SingleDataset(data_fp, img_size, buffer_size))
