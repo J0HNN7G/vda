@@ -122,10 +122,10 @@ class SingleDataset(BaseDataset):
             # put into batch arrays
             batch_images[i][:, :img.shape[1], :img.shape[2]] = img
 
-            record_idx = int(record_img_fn[-(1 + len('.png'))])
+            record_idx = extract_integer(record_img_fn)
             for j in range(self.num_balls):
-                record_state = list(ball_csvs[0].iloc[record_idx][[0, 1, 7, 8]]) + [data_info[str(j)]['mass']] + [
-                    data_info[str(j)]['friction']]
+                record_state = list(ball_csvs[j].iloc[record_idx][['pose_x', 'pose_y', 'vel_lin_x', 'vel_lin_y']]) \
+                               + [data_info[str(j)]['mass']] + [data_info[str(j)]['friction'] + data_info[str(j)]['radius']]
                 batch_states[i][j] = torch.FloatTensor(record_state)
 
         output = dict()

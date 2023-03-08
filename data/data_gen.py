@@ -24,7 +24,9 @@ CAM_VIEW_MATRIX = pb.computeViewMatrix(
         cameraEyePosition=[0, 0, 2],
         cameraTargetPosition=[0, 0, 0],
         cameraUpVector=[0, 1, 0])
+
 # camera projection matrix
+# perfect fov (not really) 53.13010235415598
 CAM_PROJECTION_MATRIX = pb.computeProjectionMatrixFOV(
         fov=55.0,
         aspect=1.0,

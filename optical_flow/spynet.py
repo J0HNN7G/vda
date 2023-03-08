@@ -171,6 +171,5 @@ def spynet_optical_flow(tenOne, tenTwo):
 
     tenFlow[:, 0, :, :] *= float(intWidth) / float(intPreprocessedWidth)
     tenFlow[:, 1, :, :] *= float(intHeight) / float(intPreprocessedHeight)
-
     return tenFlow[0, :, :, :].cpu()
 # end
