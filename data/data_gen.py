@@ -12,7 +12,7 @@ import argparse
 
 
 # project directory
-PROJECT_DIR = '/home/jonathan/Documents/diss/intuitive_physics'
+PROJECT_DIR = '/home/jonathan/Documents/diss/intuitive_physics/data'
 
 # frame rate parameters PyBullet
 PB_FPS = 240
@@ -33,13 +33,13 @@ CAM_PROJECTION_MATRIX = pb.computeProjectionMatrixFOV(
         nearVal=0.1,
         farVal=3.1)
 
-# minimum x in metres for world bounds
+# minimum x in metres for urdf bounds
 WORLD_X_MIN = -0.5
-# maximum x in metres for world bounds
+# maximum x in metres for urdf bounds
 WORLD_X_MAX = 0.5
-# minimum y in metres for world bounds
+# minimum y in metres for urdf bounds
 WORLD_Y_MIN = -0.5
-# maximum y in metres for world bounds
+# maximum y in metres for urdf bounds
 WORLD_Y_MAX = 0.5
 
 # ball radius range in metres
@@ -138,12 +138,12 @@ def initialize_simulator(use_gui):
 
 def initialize_environment(data_folder):
     """Create environment"""
-    world_filepath = os.path.join(PROJECT_DIR, 'world')
-    plane_filepath = os.path.join(world_filepath, 'plane', 'plane.urdf')
-    wall1_filepath = os.path.join(world_filepath, 'wall1', 'wall1.urdf')
-    wall2_filepath = os.path.join(world_filepath, 'wall2', 'wall2.urdf')
-    wall3_filepath = os.path.join(world_filepath, 'wall3', 'wall3.urdf')
-    wall4_filepath = os.path.join(world_filepath, 'wall4', 'wall4.urdf')
+    urdf_filepath = os.path.join(PROJECT_DIR, 'urdf')
+    plane_filepath = os.path.join(urdf_filepath, 'plane', 'plane.urdf')
+    wall1_filepath = os.path.join(urdf_filepath, 'wall1', 'wall1.urdf')
+    wall2_filepath = os.path.join(urdf_filepath, 'wall2', 'wall2.urdf')
+    wall3_filepath = os.path.join(urdf_filepath, 'wall3', 'wall3.urdf')
+    wall4_filepath = os.path.join(urdf_filepath, 'wall4', 'wall4.urdf')
 
     planeId = pb.loadURDF(plane_filepath)
     wall1Id = pb.loadURDF(wall1_filepath)

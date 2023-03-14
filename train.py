@@ -10,21 +10,22 @@ from distutils.version import LooseVersion
 import torch
 import torch.nn as nn
 # Our libs
-from mit_semseg.config import cfg
-from mit_semseg.dataset import TrainDataset
-from mit_semseg.models import ModelBuilder, SegmentationModule
-from mit_semseg.utils import AverageMeter, parse_devices, setup_logger
-from mit_semseg.lib.nn import UserScatteredDataParallel, user_scattered_collate, patch_replication_callback
+from utils.log import setup_logger, AverageMeter
+from utils.gpu import parse_devices
+from utils.config import cfg
+from utils.dataset import TrainMultiDataset
+from utils.lib.nn import UserScatteredDataParallel, user_scattered_collate, patch_replication_callback
+from utils.models import ModelBuilder
 
 
 # train one epoch
-def train(segmentation_module, iterator, optimizers, history, epoch, cfg):
+def train(net_perceptual, iterator, optimizers, history, epoch, cfg):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     ave_total_loss = AverageMeter()
     ave_acc = AverageMeter()
 
-    segmentation_module.train(not cfg.TRAIN.fix_bn)
+    net_perceptual.train()
 
     # main loop
     tic = time.time()
@@ -32,14 +33,14 @@ def train(segmentation_module, iterator, optimizers, history, epoch, cfg):
         # load a batch of data
         batch_data = next(iterator)
         data_time.update(time.time() - tic)
-        segmentation_module.zero_grad()
+        net_perceptual.zero_grad()
 
         # adjust learning rate
         cur_iter = i + (epoch - 1) * cfg.TRAIN.epoch_iters
         adjust_learning_rate(optimizers, cur_iter, cfg)
 
         # forward pass
-        loss, acc = segmentation_module(batch_data)
+        loss, acc = net_perceptual(batch_data)
         loss = loss.mean()
         acc = acc.mean()
 
@@ -54,18 +55,14 @@ def train(segmentation_module, iterator, optimizers, history, epoch, cfg):
 
         # update average loss and acc
         ave_total_loss.update(loss.data.item())
-        ave_acc.update(acc.data.item()*100)
+        ave_acc.update(acc.data.item() * 100)
 
         # calculate accuracy, and display
         if i % cfg.TRAIN.disp_iter == 0:
-            print('Epoch: [{}][{}/{}], Time: {:.2f}, Data: {:.2f}, '
-                  'lr_encoder: {:.6f}, lr_decoder: {:.6f}, '
-                  'Accuracy: {:4.2f}, Loss: {:.6f}'
-                  .format(epoch, i, cfg.TRAIN.epoch_iters,
-                          batch_time.average(), data_time.average(),
-                          cfg.TRAIN.running_lr_encoder, cfg.TRAIN.running_lr_decoder,
-                          ave_acc.average(), ave_total_loss.average()))
-
+            print(
+                f'Epoch: [{epoch}][{i}/{cfg.TRAIN.epoch_iters}], Time: {batch_time.average():.2f}, Data: {data_time.average():.2f}, '
+                f'lr_perceptual: {cfg.TRAIN.running_lr_encoder:.6f}, '
+                f'Accuracy: {ave_acc.average():.2f}, Loss: {ave_total_loss.average():.6f}')
             fractional_epoch = epoch - 1 + 1. * i / cfg.TRAIN.epoch_iters
             history['train']['epoch'].append(fractional_epoch)
             history['train']['loss'].append(loss.data.item())
@@ -74,20 +71,16 @@ def train(segmentation_module, iterator, optimizers, history, epoch, cfg):
 
 def checkpoint(nets, history, cfg, epoch):
     print('Saving checkpoints...')
-    (net_encoder, net_decoder, crit) = nets
+    (net_perceptual, crit) = nets
 
-    dict_encoder = net_encoder.state_dict()
-    dict_decoder = net_decoder.state_dict()
+    dict_perceptual = net_perceptual.state_dict()
 
     torch.save(
         history,
-        '{}/history_epoch_{}.pth'.format(cfg.DIR, epoch))
+        f'{cfg.DIR}/history_epoch_{epoch}.pth')
     torch.save(
-        dict_encoder,
-        '{}/encoder_epoch_{}.pth'.format(cfg.DIR, epoch))
-    torch.save(
-        dict_decoder,
-        '{}/decoder_epoch_{}.pth'.format(cfg.DIR, epoch))
+        dict_perceptual,
+        f'{cfg.DIR}/perceptual_epoch_{epoch}.pth')
 
 
 def group_weight(module):
@@ -113,19 +106,14 @@ def group_weight(module):
     return groups
 
 
-def create_optimizers(nets, cfg):
-    (net_encoder, net_decoder, crit) = nets
-    optimizer_encoder = torch.optim.SGD(
-        group_weight(net_encoder),
-        lr=cfg.TRAIN.lr_encoder,
+def create_optimizer(nets, cfg):
+    (net_perceptual, crit) = nets
+    optimizer_perceptual = torch.optim.SGD(
+        group_weight(net_perceptual),
+        lr=cfg.TRAIN.lr_perceptual,
         momentum=cfg.TRAIN.beta1,
         weight_decay=cfg.TRAIN.weight_decay)
-    optimizer_decoder = torch.optim.SGD(
-        group_weight(net_decoder),
-        lr=cfg.TRAIN.lr_decoder,
-        momentum=cfg.TRAIN.beta1,
-        weight_decay=cfg.TRAIN.weight_decay)
-    return (optimizer_encoder, optimizer_decoder)
+    return optimizer_perceptual
 
 
 def adjust_learning_rate(optimizers, cur_iter, cfg):
@@ -141,32 +129,17 @@ def adjust_learning_rate(optimizers, cur_iter, cfg):
 
 
 def main(cfg, gpus):
-    # Network Builders
-    net_encoder = ModelBuilder.build_encoder(
-        arch=cfg.MODEL.arch_encoder.lower(),
-        fc_dim=cfg.MODEL.fc_dim,
-        weights=cfg.MODEL.weights_encoder)
-    net_decoder = ModelBuilder.build_decoder(
-        arch=cfg.MODEL.arch_decoder.lower(),
-        fc_dim=cfg.MODEL.fc_dim,
-        num_class=cfg.DATASET.num_class,
-        weights=cfg.MODEL.weights_decoder)
+    # Network Builder
+    net_perceptual = ModelBuilder.build_perceptual(weights=cfg.MODEL.weights_perceptual)
 
     crit = nn.NLLLoss(ignore_index=-1)
 
-    if cfg.MODEL.arch_decoder.endswith('deepsup'):
-        segmentation_module = SegmentationModule(
-            net_encoder, net_decoder, crit, cfg.TRAIN.deep_sup_scale)
-    else:
-        segmentation_module = SegmentationModule(
-            net_encoder, net_decoder, crit)
-
     # Dataset and Loader
-    dataset_train = TrainDataset(
-        cfg.DATASET.root_dataset,
+    dataset_train = TrainMultiDataset(
         cfg.DATASET.list_train,
-        cfg.DATASET,
-        batch_per_gpu=cfg.TRAIN.batch_size_per_gpu)
+        img_size=(256, 256),
+        buffer_size=3,
+        random_order=True)
 
     loader_train = torch.utils.data.DataLoader(
         dataset_train,
@@ -176,32 +149,32 @@ def main(cfg, gpus):
         num_workers=cfg.TRAIN.workers,
         drop_last=True,
         pin_memory=True)
-    print('1 Epoch = {} iters'.format(cfg.TRAIN.epoch_iters))
+    print(f'1 Epoch = {cfg.TRAIN.epoch_iters} iters')
 
     # create loader iterator
     iterator_train = iter(loader_train)
 
     # load nets into gpu
     if len(gpus) > 1:
-        segmentation_module = UserScatteredDataParallel(
-            segmentation_module,
+        net_perceptual = UserScatteredDataParallel(
+            net_perceptual,
             device_ids=gpus)
         # For sync bn
-        patch_replication_callback(segmentation_module)
-    segmentation_module.cuda()
+        patch_replication_callback(net_perceptual)
+    net_perceptual.cuda()
 
     # Set up optimizers
-    nets = (net_encoder, net_decoder, crit)
-    optimizers = create_optimizers(nets, cfg)
+    nets = (net_perceptual, crit)
+    optimizer = create_optimizer(nets, cfg)
 
     # Main loop
     history = {'train': {'epoch': [], 'loss': [], 'acc': []}}
 
     for epoch in range(cfg.TRAIN.start_epoch, cfg.TRAIN.num_epoch):
-        train(segmentation_module, iterator_train, optimizers, history, epoch+1, cfg)
+        train(net_perceptual, iterator_train, optimizer, history, epoch + 1, cfg)
 
         # checkpointing
-        checkpoint(nets, history, cfg, epoch+1)
+        checkpoint(nets, history, cfg, epoch + 1)
 
     print('Training Done!')
 
@@ -232,27 +205,24 @@ if __name__ == '__main__':
 
     cfg.merge_from_file(args.cfg)
     cfg.merge_from_list(args.opts)
-    # cfg.freeze()
 
-    logger = setup_logger(distributed_rank=0)   # TODO
+    logger = setup_logger(distributed_rank=0)
     logger.info("Loaded configuration file {}".format(args.cfg))
     logger.info("Running with config:\n{}".format(cfg))
 
     # Output directory
     if not os.path.isdir(cfg.DIR):
         os.makedirs(cfg.DIR)
-    logger.info("Outputing checkpoints to: {}".format(cfg.DIR))
+    logger.info("Outputting checkpoints to: {}".format(cfg.DIR))
     with open(os.path.join(cfg.DIR, 'config.yaml'), 'w') as f:
         f.write("{}".format(cfg))
 
     # Start from checkpoint
     if cfg.TRAIN.start_epoch > 0:
-        cfg.MODEL.weights_encoder = os.path.join(
-            cfg.DIR, 'encoder_epoch_{}.pth'.format(cfg.TRAIN.start_epoch))
-        cfg.MODEL.weights_decoder = os.path.join(
-            cfg.DIR, 'decoder_epoch_{}.pth'.format(cfg.TRAIN.start_epoch))
-        assert os.path.exists(cfg.MODEL.weights_encoder) and \
-            os.path.exists(cfg.MODEL.weights_decoder), "checkpoint does not exitst!"
+        cfg.MODEL.weights_perceptual = os.path.join(
+            cfg.DIR, f'perceptual_epoch_{cfg.TRAIN.start_epoch}.pth')
+        assert os.path.exists(cfg.MODEL.weights_perceptual) and \
+               os.path.exists(cfg.MODEL.weights_perceptual), "checkpoint does not exist!"
 
     # Parse gpu ids
     gpus = parse_devices(args.gpus)
@@ -262,11 +232,9 @@ if __name__ == '__main__':
     cfg.TRAIN.batch_size = num_gpus * cfg.TRAIN.batch_size_per_gpu
 
     cfg.TRAIN.max_iters = cfg.TRAIN.epoch_iters * cfg.TRAIN.num_epoch
-    cfg.TRAIN.running_lr_encoder = cfg.TRAIN.lr_encoder
-    cfg.TRAIN.running_lr_decoder = cfg.TRAIN.lr_decoder
+    cfg.TRAIN.running_lr_perceptual = cfg.TRAIN.lr_perceptual
 
     random.seed(cfg.TRAIN.seed)
     torch.manual_seed(cfg.TRAIN.seed)
 
     main(cfg, gpus)
-Footer

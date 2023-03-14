@@ -84,9 +84,9 @@ class BaseDataset(torch.utils.data.Dataset):
         return img
 
 
-class SingleDataset(BaseDataset):
+class TrainSingleDataset(BaseDataset):
     def __init__(self, data_fp, img_size, buffer_size, **kwargs):
-        super(SingleDataset, self).__init__(data_fp, img_size, buffer_size, **kwargs)
+        super(TrainSingleDataset, self).__init__(data_fp, img_size, buffer_size, **kwargs)
         self.cur_idx = 0
         self.if_shuffled = False
 
@@ -137,11 +137,11 @@ class SingleDataset(BaseDataset):
         return self.num_sample - self.buffer_size
 
 
-class MultiDataset(torch.utils.data.Dataset):
+class TrainMultiDataset(torch.utils.data.Dataset):
     def __init__(self, data_fps, img_size, buffer_size, random_order=False, **kwargs):
         self.datasets = []
         for data_fp in data_fps:
-            self.datasets.append(SingleDataset(data_fp, img_size, buffer_size))
+            self.datasets.append(TrainSingleDataset(data_fp, img_size, buffer_size))
         self.dataset_cur_idx = -1
         self.random_order = random_order
         self.if_shuffled = False
