@@ -3,6 +3,7 @@ DATASET:
   list_train: "./data/same_vis_same_phys/train"
   list_val: "./data/same_vis_same_phys/val"
   imgSize: (256, 256)
+  bufferSize: 3
 
 MODEL:
   optical_flow: "farneback"

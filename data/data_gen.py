@@ -10,7 +10,6 @@ import time
 import json
 import argparse
 
-
 # project directory
 PROJECT_DIR = '/home/jonathan/Documents/diss/intuitive_physics/data'
 
@@ -21,17 +20,17 @@ PB_SEC_PER_FRAME = 1 / PB_FPS
 
 # camera view matrix
 CAM_VIEW_MATRIX = pb.computeViewMatrix(
-        cameraEyePosition=[0, 0, 2],
-        cameraTargetPosition=[0, 0, 0],
-        cameraUpVector=[0, 1, 0])
+    cameraEyePosition=[0, 0, 2],
+    cameraTargetPosition=[0, 0, 0],
+    cameraUpVector=[0, 1, 0])
 
 # camera projection matrix
 # perfect fov (not really) 53.13010235415598
 CAM_PROJECTION_MATRIX = pb.computeProjectionMatrixFOV(
-        fov=55.0,
-        aspect=1.0,
-        nearVal=0.1,
-        farVal=3.1)
+    fov=55.0,
+    aspect=1.0,
+    nearVal=0.1,
+    farVal=3.1)
 
 # minimum x in metres for urdf bounds
 WORLD_X_MIN = -0.5
@@ -42,15 +41,12 @@ WORLD_Y_MIN = -0.5
 # maximum y in metres for urdf bounds
 WORLD_Y_MAX = 0.5
 
-# ball radius range in metres
-INC_RAD = 0.05 # min and increment
-MAX_RAD = 0.1
-# ball mass range in kilograms
-INC_MASS = 0.1 # min and increment
-MAX_MASS = 1
-# rolling friction range (10 ** (FRIC_EXP) )
-MIN_FRIC_EXP = -4
-MAX_FRIC_EXP = -2
+# ball radius values in metres
+RAD_VALUES = np.array([0.03, 0.06, 0.09])
+# ball mass values in kilograms
+MASS_VALUES = np.array([0.2, 0.4, 0.6])
+# rolling friction coefficient values
+FRIC_VALUES = np.array([10**(-4), 5*10**(-4), 10**(-3)])
 # linear velocity range in ms⁻1
 MAX_ABS_VEL = 2.5
 # variety of colours for balls
@@ -59,35 +55,36 @@ BALL_COLOR_OPT = np.array([
     [168, 174, 62, 255], [136, 116, 217, 255], [105, 160, 80, 255],
     [190, 100, 178, 255], [188, 125, 54, 255], [93, 138, 212, 255],
     [185, 73, 115, 255]]) / 255.0
+
 # ball csv properties
-BALL_SIM_COL_NAMES = ['timestep', 'pose_x',  'pose_y', 'pose_z',
-                      'pose_rx', 'pose_ry','pose_rz', 'pose_rw',
+BALL_SIM_COL_NAMES = ['timestep', 'pose_x', 'pose_y', 'pose_z',
+                      'pose_rx', 'pose_ry', 'pose_rz', 'pose_rw',
                       'vel_lin_x', 'vel_lin_y', 'vel_lin_z',
                       'vel_ang_x', 'vel_ang_y', 'vel_ang_z']
 
 
 def get_parser():
     parser = argparse.ArgumentParser(
-                prog="Synthetic Pool Ball Collision Data Generator",
-                description="Simulate top-down synthetic pool ball collision videos")
+        prog="Synthetic Pool Ball Collision Data Generator",
+        description="Simulate top-down synthetic pool ball collision videos")
 
     parser.add_argument("--data-folder", default='data',
-                        help = "folder where all data is saved (default: 'data')")
+                        help="folder where all data is saved (default: 'data')")
 
     parser.add_argument("--sim-name", default='sample',
-                        help = "simulation folder prefix in data folder (default: 'sample')")
+                        help="simulation folder prefix in data folder (default: 'sample')")
 
     parser.add_argument("--img-prefix", default='timestep_',
-                        help = "prefix for simulation image files (default: 'timestep_')")
+                        help="prefix for simulation image files (default: 'timestep_')")
 
     parser.add_argument("--img-type", default='.png',
-                        help = "image type for simulation files (default: '.png')")
+                        help="image type for simulation files (default: '.png')")
 
     parser.add_argument("--csv-prefix", default='ball_',
-                        help = "simulation balls csv data prefix (default: 'ball_')")
+                        help="simulation balls csv data prefix (default: 'ball_')")
 
     parser.add_argument("--json-prefix", default='info',
-                        help = "simulation balls csv data prefix (default: 'info')")
+                        help="simulation balls csv data prefix (default: 'info')")
 
     parser.add_argument("--use-gui", action='store_true', default=False,
                         help="visualize with PyBullet GUI (default: False)")
@@ -114,7 +111,7 @@ def get_parser():
                         help="keep the physics same for all balls (default: False)")
 
     parser.add_argument("--rand-seed", type=int, default=42,
-                        help = "random seed for numpy (default=42)")
+                        help="random seed for numpy (default=42)")
 
     return parser
 
@@ -152,11 +149,38 @@ def initialize_environment(data_folder):
     wall4Id = pb.loadURDF(wall4_filepath)
 
     # set environment conditions
-    pb.setGravity(0,0,-9.81)
+    pb.setGravity(0, 0, -9.81)
 
     # environment object id dictionary
-    env_id_dict = { 'planeId' : planeId, 'wallIds' : [wall1Id, wall2Id, wall3Id, wall4Id]}
+    env_id_dict = {'planeId': planeId, 'wallIds': [wall1Id, wall2Id, wall3Id, wall4Id]}
     return env_id_dict
+
+def ballProps2Label(idxs):
+    """
+    Converts indexes for ball properties to unique index.
+    """
+    shape = [len(MASS_VALUES), len(FRIC_VALUES)]
+    idx = 0
+    offset = 1
+    for i in range(len(shape) - 1, -1, -1):
+        idx += idxs[i] * offset
+        offset *= shape[i]
+    return idx
+
+
+def label2BallProps(idx):
+    """
+    Converts unique index for intrinsic properties to indexes for each intrinsic property
+    indices of an element in a flattened numpy array.
+    """
+    shape = [len(MASS_VALUES), len(FRIC_VALUES)]
+    num_dims = len(shape)
+    offset = 1
+    idxs = [0] * num_dims
+    for i in range(num_dims - 1, -1, -1):
+        idxs[i] = idx // offset % shape[i]
+        offset *= shape[i]
+    return idxs
 
 
 def initialize_balls(num_balls, same_phys, same_vis):
@@ -164,33 +188,40 @@ def initialize_balls(num_balls, same_phys, same_vis):
 
     # randomized ball properties
     if same_phys:
-        ballMass = [INC_MASS + np.random.randint(int(MAX_MASS / INC_MASS)) * INC_MASS] * num_balls
-        ballFriction = [np.power(10.0, np.random.randint(low=MIN_FRIC_EXP, high=MAX_FRIC_EXP))] * num_balls
+        ball_mass_idx = np.array([np.random.randint(len(MASS_VALUES))] * num_balls, dtype=int)
+        ball_fric_idx = np.array([np.random.randint(len(FRIC_VALUES))] * num_balls, dtype=int)
     else:
-        ballMass = INC_MASS + np.random.randint(int(MAX_MASS / INC_MASS), size=num_balls) * INC_MASS
-        ballFriction = np.power(10.0, np.random.randint(low=MIN_FRIC_EXP, high=MAX_FRIC_EXP, size=num_balls))
+        ball_mass_idx = np.random.randint(len(MASS_VALUES), size=num_balls, dtype=int)
+        ball_fric_idx = np.random.randint(len(FRIC_VALUES), size=num_balls, dtype=int)
+    ballMass = MASS_VALUES[ball_mass_idx]
+    ballFriction = FRIC_VALUES[ball_fric_idx]
 
     if same_vis:
-        ballRadi = [INC_RAD + np.random.randint(int(MAX_RAD / INC_RAD)) * INC_RAD] * num_balls
-        ballColors = [BALL_COLOR_OPT[np.random.choice(len(BALL_COLOR_OPT))]] * num_balls
+        ball_radi_idx = np.array([np.random.randint(len(RAD_VALUES))] * num_balls, dtype=int)
+        ball_color_idx = np.array([np.random.randint(len(BALL_COLOR_OPT))] * num_balls, dtype=int)
     else:
-        ballRadi = INC_RAD + np.random.randint(int(MAX_RAD / INC_RAD), size=num_balls) * INC_RAD
-        ballColors = BALL_COLOR_OPT[np.random.choice(len(BALL_COLOR_OPT), num_balls)]
+        ball_radi_idx = np.random.randint(len(RAD_VALUES), size=num_balls, dtype=int)
+        ball_color_idx = np.random.randint(len(BALL_COLOR_OPT), size=num_balls, dtype=int)
+    ballRadi = RAD_VALUES[ball_radi_idx]
+    ballColor = BALL_COLOR_OPT[ball_color_idx]
 
-    ballInitLinVel = [ newScale(np.append(np.random.rand(2), 0), newMin=-MAX_ABS_VEL, newMax=MAX_ABS_VEL) for _ in range(num_balls)]
-    ballInitAngVel = [[0,0,0]] * num_balls
+    ballInitLinVel = [newScale(np.append(np.random.rand(2), 0), newMin=-MAX_ABS_VEL, newMax=MAX_ABS_VEL) for _ in
+                      range(num_balls)]
+    ballInitAngVel = [[0, 0, 0]] * num_balls
 
     # create balls in simulation
     ballIds = []
+    ballPropIdxs = []
     ballInitPos = []
     for i in range(num_balls):
         # create new position that does not overlap with walls or balls
         allSafePos = False
         while not allSafePos:
             # new position guaranteed not to overlap with walls
-            initPos = np.array([newScale(np.random.rand(), newMin=WORLD_X_MIN+ballRadi[i], newMax=WORLD_X_MAX-ballRadi[i]),
-                                newScale(np.random.rand(), newMin=WORLD_Y_MIN+ballRadi[i], newMax=WORLD_Y_MAX-ballRadi[i]),
-                                ballRadi[i]+0.01])
+            initPos = np.array(
+                [newScale(np.random.rand(), newMin=WORLD_X_MIN + ballRadi[i], newMax=WORLD_X_MAX - ballRadi[i]),
+                 newScale(np.random.rand(), newMin=WORLD_Y_MIN + ballRadi[i], newMax=WORLD_Y_MAX - ballRadi[i]),
+                 ballRadi[i] + 0.01])
             # check if overlaps with other balls
             isSafePos = True
             for j in range(i):
@@ -203,20 +234,24 @@ def initialize_balls(num_balls, same_phys, same_vis):
 
         # adding balls to simulation
         colBallId = pb.createCollisionShape(pb.GEOM_SPHERE, radius=ballRadi[i])
-        visualBallId = pb.createVisualShape(pb.GEOM_SPHERE, radius=ballRadi[i], rgbaColor=ballColors[i])
+        visualBallId = pb.createVisualShape(pb.GEOM_SPHERE, radius=ballRadi[i], rgbaColor=ballColor[i])
         ballId = pb.createMultiBody(baseMass=ballMass[i],
                                     baseInertialFramePosition=[0, 0, 0],
                                     baseCollisionShapeIndex=colBallId,
                                     baseVisualShapeIndex=visualBallId,
                                     basePosition=ballInitPos[i])
         # set object properties
-        pb.changeDynamics(ballId, -1, rollingFriction=ballFriction[i], contactProcessingThreshold=0, restitution=0.9, linearDamping=0, angularDamping=0)
+        pb.changeDynamics(ballId, -1, rollingFriction=ballFriction[i], contactProcessingThreshold=0, restitution=0.9,
+                          linearDamping=0, angularDamping=0)
         pb.resetBaseVelocity(ballId, ballInitLinVel[i], ballInitAngVel[i])
+
+        ballPropIdx = int(ballProps2Label([ball_mass_idx[i], ball_fric_idx[i]]))
+        ballPropIdxs.append(ballPropIdx)
 
         # keeping object Id
         ballIds.append(ballId)
 
-    return ballIds, ballColors, ballRadi, ballMass, ballFriction
+    return ballIds, ballPropIdxs, ballColor, ballRadi, ballMass, ballFriction
 
 
 def initialize_directory(data_folder, sim_name):
@@ -234,16 +269,18 @@ def initialize_directory(data_folder, sim_name):
     return video_fp
 
 
-def save_simulation_info(video_fp, json_prefix, des_fps, num_balls, ballColors, ballRadi, ballMass, ballFriction):
+def save_simulation_info(video_fp, json_prefix, des_fps, num_balls, ballPropxIdxs, ballColors, ballRadi, ballMass,
+                         ballFriction):
     # saving object properties
     objects_info_filepath = os.path.join(video_fp, json_prefix + '.json')
-    objects_info = {'fps' : des_fps, 'num_balls' : num_balls}
+    objects_info = {'fps': des_fps, 'num_balls': num_balls}
     for i in range(num_balls):
-        objects_info[i]  = {
-        'color' : list(ballColors[i]),
-        'radius' : ballRadi[i],
-        'mass' : ballMass[i],
-        'friction' : ballFriction[i]
+        objects_info[i] = {
+            'label': ballPropxIdxs[i],
+            'color': list(ballColors[i]),
+            'radius': ballRadi[i],
+            'mass': ballMass[i],
+            'friction': ballFriction[i]
         }
     with open(objects_info_filepath, "w") as f:
         json.dump(objects_info, f)
@@ -258,15 +295,17 @@ def save_ball_infos(video_fp, csv_prefix, num_balls, ball_sim_values):
         df.to_csv(ball_csv_filepath, index=False)
 
 
-def run_simulation(data_folder, sim_name, img_prefix, img_type, csv_prefix, json_prefix, use_gui, use_render, des_fps, duration, num_balls, same_phys, same_vis):
+def run_simulation(data_folder, sim_name, img_prefix, img_type, csv_prefix, json_prefix, use_gui, use_render, des_fps,
+                   duration, num_balls, same_phys, same_vis):
     initialize_simulator(use_gui)
 
     env_id_dict = initialize_environment(data_folder)
-    ballIds, ballColors, ballRadi, ballMass, ballFriction = initialize_balls(num_balls, same_phys, same_vis)
+    ballIds, ballPropIdxs, ballColors, ballRadi, ballMass, ballFriction = initialize_balls(num_balls, same_phys,
+                                                                                           same_vis)
     video_fp = initialize_directory(data_folder, sim_name)
 
-    save_simulation_info(video_fp, json_prefix, des_fps, num_balls, ballColors, ballRadi, ballMass, ballFriction)
-
+    save_simulation_info(video_fp, json_prefix, des_fps, num_balls, ballPropIdxs, ballColors, ballRadi, ballMass,
+                         ballFriction)
 
     # desired total number of timesteps
     pb_total_timesteps = int(duration * PB_FPS)
@@ -290,18 +329,21 @@ def run_simulation(data_folder, sim_name, img_prefix, img_type, csv_prefix, json
             for i in range(num_balls):
                 ballId = ballIds[i]
                 ball_sim_values[i, :, curr_num_des_frames] = np.concatenate([[curr_num_des_frames],
-                                                                             np.concatenate(pb.getBasePositionAndOrientation(ballIds[i])),
-                                                                             np.concatenate(pb.getBaseVelocity(ballIds[i]))
+                                                                             np.concatenate(
+                                                                                 pb.getBasePositionAndOrientation(
+                                                                                     ballIds[i])),
+                                                                             np.concatenate(
+                                                                                 pb.getBaseVelocity(ballIds[i]))
                                                                              ])
 
             # taking image
             if use_render:
                 width, height, rgbImg, depthImg, segImg = pb.getCameraImage(
-                                                                        width=256,
-                                                                        height=256,
-                                                                        viewMatrix=CAM_VIEW_MATRIX,
-                                                                        projectionMatrix=CAM_PROJECTION_MATRIX,
-                                                                        lightDirection=[0, 0, 4])
+                    width=256,
+                    height=256,
+                    viewMatrix=CAM_VIEW_MATRIX,
+                    projectionMatrix=CAM_PROJECTION_MATRIX,
+                    lightDirection=[0, 0, 4])
                 # save image
                 im = Image.fromarray(rgbImg)
                 img_name = f"{img_prefix}{curr_num_des_frames}{img_type}"
@@ -312,7 +354,7 @@ def run_simulation(data_folder, sim_name, img_prefix, img_type, csv_prefix, json
 
         if use_gui:
             frame_elapsed_sec = time.time() - frame_init_time
-            if frame_elapsed_sec <  PB_SEC_PER_FRAME:
+            if frame_elapsed_sec < PB_SEC_PER_FRAME:
                 time.sleep(PB_SEC_PER_FRAME - frame_elapsed_sec)
             frame_init_time = time.time()
 

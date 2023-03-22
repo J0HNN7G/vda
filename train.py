@@ -5,7 +5,6 @@ import time
 # import math
 import random
 import argparse
-from distutils.version import LooseVersion
 # Numerical libs
 import torch
 import torch.nn as nn
@@ -15,17 +14,17 @@ from utils.gpu import parse_devices
 from utils.config import cfg
 from utils.dataset import TrainMultiDataset
 from utils.lib.nn import UserScatteredDataParallel, user_scattered_collate, patch_replication_callback
-from utils.models import ModelBuilder
+from utils.models.models import ModelBuilder, PerceptualModule
 
 
 # train one epoch
-def train(net_perceptual, iterator, optimizers, history, epoch, cfg):
+def train(perceptual_module, iterator, optimizers, history, epoch, cfg):
     batch_time = AverageMeter()
     data_time = AverageMeter()
     ave_total_loss = AverageMeter()
     ave_acc = AverageMeter()
 
-    net_perceptual.train()
+    perceptual_module.train()
 
     # main loop
     tic = time.time()
@@ -33,14 +32,14 @@ def train(net_perceptual, iterator, optimizers, history, epoch, cfg):
         # load a batch of data
         batch_data = next(iterator)
         data_time.update(time.time() - tic)
-        net_perceptual.zero_grad()
+        perceptual_module.zero_grad()
 
         # adjust learning rate
         cur_iter = i + (epoch - 1) * cfg.TRAIN.epoch_iters
         adjust_learning_rate(optimizers, cur_iter, cfg)
 
         # forward pass
-        loss, acc = net_perceptual(batch_data)
+        loss, acc = perceptual_module(batch_data)
         loss = loss.mean()
         acc = acc.mean()
 
@@ -61,7 +60,7 @@ def train(net_perceptual, iterator, optimizers, history, epoch, cfg):
         if i % cfg.TRAIN.disp_iter == 0:
             print(
                 f'Epoch: [{epoch}][{i}/{cfg.TRAIN.epoch_iters}], Time: {batch_time.average():.2f}, Data: {data_time.average():.2f}, '
-                f'lr_perceptual: {cfg.TRAIN.running_lr_encoder:.6f}, '
+                f'lr_perceptual: {cfg.TRAIN.running_lr_perceptual:.6f}, '
                 f'Accuracy: {ave_acc.average():.2f}, Loss: {ave_total_loss.average():.6f}')
             fractional_epoch = epoch - 1 + 1. * i / cfg.TRAIN.epoch_iters
             history['train']['epoch'].append(fractional_epoch)
@@ -113,55 +112,64 @@ def create_optimizer(nets, cfg):
         lr=cfg.TRAIN.lr_perceptual,
         momentum=cfg.TRAIN.beta1,
         weight_decay=cfg.TRAIN.weight_decay)
-    return optimizer_perceptual
+    return optimizer_perceptual,
 
 
 def adjust_learning_rate(optimizers, cur_iter, cfg):
     scale_running_lr = ((1. - float(cur_iter) / cfg.TRAIN.max_iters) ** cfg.TRAIN.lr_pow)
-    cfg.TRAIN.running_lr_encoder = cfg.TRAIN.lr_encoder * scale_running_lr
-    cfg.TRAIN.running_lr_decoder = cfg.TRAIN.lr_decoder * scale_running_lr
+    cfg.TRAIN.running_lr_perceptual = cfg.TRAIN.lr_perceptual * scale_running_lr
 
-    (optimizer_encoder, optimizer_decoder) = optimizers
-    for param_group in optimizer_encoder.param_groups:
-        param_group['lr'] = cfg.TRAIN.running_lr_encoder
-    for param_group in optimizer_decoder.param_groups:
-        param_group['lr'] = cfg.TRAIN.running_lr_decoder
+    optimizer_perceptual, = optimizers
+    for param_group in optimizer_perceptual.param_groups:
+        param_group['lr'] = cfg.TRAIN.running_lr_perceptual
 
 
 def main(cfg, gpus):
-    # Network Builder
-    net_perceptual = ModelBuilder.build_perceptual(weights=cfg.MODEL.weights_perceptual)
+    optical_flow = ModelBuilder.build_optical_flow()
+    net_perceptual = ModelBuilder.build_perceptual(arch='resnet18', input_dim=13, num_classes=9,
+                                                   weights=cfg.MODEL.weights_perceptual)
+    crit = torch.nn.CrossEntropyLoss(ignore_index=-1)
+    perceptual_module = PerceptualModule(optical_flow, net_perceptual, crit, buffer_size=cfg.DATASET.bufferSize)
 
-    crit = nn.NLLLoss(ignore_index=-1)
 
     # Dataset and Loader
+    dataset_train_fps = [os.path.join(cfg.DATASET.list_train, fp) for fp in os.listdir(cfg.DATASET.list_train)]
     dataset_train = TrainMultiDataset(
-        cfg.DATASET.list_train,
+        dataset_train_fps,
         img_size=(256, 256),
         buffer_size=3,
         random_order=True)
 
-    loader_train = torch.utils.data.DataLoader(
-        dataset_train,
-        batch_size=len(gpus),  # we have modified data_parallel
-        shuffle=False,  # we do not use this param
-        collate_fn=user_scattered_collate,
-        num_workers=cfg.TRAIN.workers,
-        drop_last=True,
-        pin_memory=True)
-    print(f'1 Epoch = {cfg.TRAIN.epoch_iters} iters')
-
-    # create loader iterator
-    iterator_train = iter(loader_train)
-
     # load nets into gpu
     if len(gpus) > 1:
-        net_perceptual = UserScatteredDataParallel(
-            net_perceptual,
+        loader_train = torch.utils.data.DataLoader(
+            dataset_train,
+            batch_size=len(gpus),  # we have modified data_parallel
+            shuffle=False,  # we do not use this param
+            collate_fn=user_scattered_collate,
+            num_workers=cfg.TRAIN.workers,
+            drop_last=True,
+            pin_memory=True)
+
+        perceptual_module = UserScatteredDataParallel(
+            perceptual_module,
             device_ids=gpus)
         # For sync bn
-        patch_replication_callback(net_perceptual)
-    net_perceptual.cuda()
+        patch_replication_callback(perceptual_module)
+    else:
+        loader_train = torch.utils.data.DataLoader(
+            dataset_train,
+            batch_size=len(gpus),  # we have modified data_parallel
+            shuffle=False,  # we do not use this param
+            num_workers=cfg.TRAIN.workers,
+            drop_last=True,
+            pin_memory=True)
+
+    # create loader iterator
+    print(f'1 Epoch = {cfg.TRAIN.epoch_iters} iters')
+    iterator_train = iter(loader_train)
+
+    perceptual_module.cuda()
 
     # Set up optimizers
     nets = (net_perceptual, crit)
@@ -171,7 +179,7 @@ def main(cfg, gpus):
     history = {'train': {'epoch': [], 'loss': [], 'acc': []}}
 
     for epoch in range(cfg.TRAIN.start_epoch, cfg.TRAIN.num_epoch):
-        train(net_perceptual, iterator_train, optimizer, history, epoch + 1, cfg)
+        train(perceptual_module, iterator_train, optimizer, history, epoch + 1, cfg)
 
         # checkpointing
         checkpoint(nets, history, cfg, epoch + 1)
@@ -192,7 +200,7 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         "--gpus",
-        default="0-3",
+        default="0",
         help="gpus to use, e.g. 0-3 or 0,1,2,3"
     )
     parser.add_argument(

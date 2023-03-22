@@ -107,7 +107,7 @@ class TrainSingleDataset(BaseDataset):
         ball_csvs = [pd.read_csv(fp, index_col=0) for fp in self.ball_csv_fps]
 
         batch_images = torch.zeros(self.buffer_size, 3, self.img_size[0], self.img_size[1])
-        batch_states = torch.zeros(self.buffer_size, self.num_balls, 6)  # x, y, x_lin_vel, y_lin_vel, mass, friction
+        batch_states = torch.zeros(self.buffer_size, self.num_balls, 6)  # x, y, x_lin_vel, y_lin_vel, radius, label
         for i in range(self.buffer_size):
             record_img_fn = batch_records[i]
 
@@ -125,7 +125,7 @@ class TrainSingleDataset(BaseDataset):
             record_idx = extract_integer(record_img_fn)
             for j in range(self.num_balls):
                 record_state = list(ball_csvs[j].iloc[record_idx][['pose_x', 'pose_y', 'vel_lin_x', 'vel_lin_y']]) \
-                               + [data_info[str(j)]['mass']] + [data_info[str(j)]['friction'] + data_info[str(j)]['radius']]
+                               + [data_info[str(j)]['radius']] + [data_info[str(j)]['label']]
                 batch_states[i][j] = torch.FloatTensor(record_state)
 
         output = dict()

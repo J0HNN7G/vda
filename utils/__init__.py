@@ -15,3 +15,4 @@ from .log import setup_logger, AverageMeter
 from .gpu import parse_devices
 from .config.defaults import _C as cfg
 from .lib.nn import UserScatteredDataParallel, user_scattered_collate, patch_replication_callback
+from .models.models import ModelBuilder, PerceptualModule

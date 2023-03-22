@@ -15,6 +15,7 @@ _C.DATASET.root_dataset = "./data/same_vis_same_phys"
 _C.DATASET.list_train = "./data/same_vis_same_phys/train"
 _C.DATASET.list_val = "./data/same_vis_same_phys/val"
 _C.DATASET.imgSize = (256, 256)
+_C.DATASET.bufferSize = 3
 
 # -----------------------------------------------------------------------------
 # Model
