@@ -48,32 +48,36 @@ class PerceptualModule(PerceptualModuleBase):
         output_data = feed_dict['state_label']
 
         BA, BU, _, H, W = input_data.shape
-        _, _, num_balls, num_features = output_data.shape
+        _, _, max_num_balls, num_features = output_data.shape
         assert BU == self.buffer_size
         C_Final = BU * 3 + (BU - 1) * 2
-        input_processed = torch.zeros(BA * num_balls, C_Final, H, W)
-        output_processed = torch.zeros(BA * num_balls, dtype=torch.long)
 
+        input_processed = torch.zeros(BA, max_num_balls, C_Final, H, W)
+        output_processed = torch.zeros(BA, max_num_balls, dtype=torch.long)
         for i in range(BA):
             for j in range(BU):
-
                 img_orig = input_data[i, j, ...]
-                for k in range(num_balls):
+                for k in range(max_num_balls):
                     cx, cy, cr = output_data[i, j, k, [0, 1, -2]]
                     img_masked = tensor_img_dist_circle_mask(img_orig, cx, cy, cr + 0.05)
-                    input_processed[i + k, j * 3:(j + 1) * 3, ...] = img_masked
+                    input_processed[i, k, j * 3:(j + 1) * 3, ...] = img_masked
 
                     if j != BU - 1:
                         opt_flow = farneback_optical_flow(input_data[i][j], input_data[i][j + 1])
                         opt_flow_masked = tensor_arr_dist_circle_mask(opt_flow, cx, cy, cr, 0.1)
-                        input_processed[i + k, BU * 3 + j * 2:BU * 3 + (j + 1) * 2, ...] = opt_flow_masked
+                        input_processed[i, k, BU * 3 + j * 2:BU * 3 + (j + 1) * 2, ...] = opt_flow_masked
 
-                    output_processed[i + k] = output_data[i, j, k, -1]
-        return input_processed.cuda(), output_processed.cuda()
+                    output_processed[i, k] = output_data[i, j, k, -1]
 
-    def forward(self, feed_dict):
-        # training
-        samples, labels = self.process_feed(feed_dict)
+        input_processed = torch.flatten(input_processed, end_dim=1).cuda()
+        output_processed = torch.flatten(output_processed, end_dim=1).cuda()
+        return input_processed, output_processed
+
+    def forward(self, feed):
+        if isinstance(feed, list):
+            feed = feed[0]
+
+        samples, labels = self.process_feed(feed)
         output = self.net_perceptual(samples)
         prediction = self.label_pred(output)
 

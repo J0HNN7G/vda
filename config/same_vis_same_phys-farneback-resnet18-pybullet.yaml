@@ -10,7 +10,7 @@ MODEL:
   perceptual: "resnet18"
 
 TRAIN:
-  batch_size_per_gpu: 2
+  batch_size_per_gpu: 1
   num_epoch: 20
   start_epoch: 0
   epoch_iters: 5000
@@ -20,7 +20,7 @@ TRAIN:
   lr_pow: 0.9
   beta1: 0.9
   weight_decay: 1e-4
-  workers: 16
+  workers: 8
   disp_iter: 20
   seed: 304
 

@@ -5,7 +5,6 @@
 # System libs
 import os
 import time
-# import math
 import random
 import argparse
 # Numerical libs
@@ -15,7 +14,7 @@ import torch.nn as nn
 from utils.metric import setup_logger, AverageMeter
 from utils.gpu import parse_devices
 from utils.config import cfg
-from utils.dataset import TrainMultiDataset
+from utils.dataset import TrainDataset
 from utils.models.lib import UserScatteredDataParallel, user_scattered_collate, patch_replication_callback
 from utils.models.models import ModelBuilder, PerceptualModule
 
@@ -136,36 +135,28 @@ def main(cfg, gpus):
 
     # Dataset and Loader
     dataset_train_fps = [os.path.join(cfg.DATASET.list_train, fp) for fp in os.listdir(cfg.DATASET.list_train)]
-    dataset_train = TrainMultiDataset(
+    dataset_train = TrainDataset(
         dataset_train_fps,
+        batch_size_per_gpu=cfg.TRAIN.batch_size_per_gpu,
         img_size=(256, 256),
-        buffer_size=3,
-        random_order=True)
+        buffer_size=3)
+
+    loader_train = torch.utils.data.DataLoader(
+        dataset_train,
+        batch_size=len(gpus),  # we have modified data_parallel
+        shuffle=False,  # we do not use this param
+        collate_fn=user_scattered_collate,
+        num_workers=cfg.TRAIN.workers,
+        drop_last=True,
+        pin_memory=True)
 
     # load nets into gpu
     if len(gpus) > 1:
-        loader_train = torch.utils.data.DataLoader(
-            dataset_train,
-            batch_size=len(gpus),  # we have modified data_parallel
-            shuffle=False,  # we do not use this param
-            collate_fn=user_scattered_collate,
-            num_workers=cfg.TRAIN.workers,
-            drop_last=True,
-            pin_memory=True)
-
         perceptual_module = UserScatteredDataParallel(
             perceptual_module,
             device_ids=gpus)
         # For sync bn
         patch_replication_callback(perceptual_module)
-    else:
-        loader_train = torch.utils.data.DataLoader(
-            dataset_train,
-            batch_size=len(gpus),  # we have modified data_parallel
-            shuffle=False,  # we do not use this param
-            num_workers=cfg.TRAIN.workers,
-            drop_last=True,
-            pin_memory=True)
 
     # create loader iterator
     print(f'1 Epoch = {cfg.TRAIN.epoch_iters} iters')
