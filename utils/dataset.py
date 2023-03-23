@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+# This file is code altered from the MIT semantic segmentation repository
+# https://github.com/CSAILVision/semantic-segmentation-pytorch
+
 import os
 import json
 import re
@@ -25,6 +28,85 @@ def img_resize(img, size, interp='bilinear'):
 
 def extract_integer(filename):
     return int(filename.split('.')[0].split('_')[1])
+
+
+def createSingleTensorDataset(data_fp, img_size, buffer_size, info_prefix='info', ball_csv_prefix='ball_',
+                              img_prefix='timestep_'):
+    data_info_fp = os.path.join(data_fp, f'{info_prefix}.json')
+    with open(data_info_fp) as f:
+        data_info = json.load(f)
+    num_balls = data_info['num_balls']
+
+    ball_csv_fps = [os.path.join(data_fp, f"{ball_csv_prefix}{i}.csv") for i in range(num_balls)]
+    ball_csvs = [pd.read_csv(fp, index_col=0) for fp in ball_csv_fps]
+
+    list_sample = []
+    fp_filter = re.compile(fr'{img_prefix}\d+.png')
+    img_fps = [fp for fp in os.listdir(data_fp) if re.match(fp_filter, fp)]
+    for fp in sorted(img_fps, key=extract_integer):
+        list_sample.append(fp)
+
+    list_buffer_sample_len = len(list_sample) - buffer_size + 1
+    list_buffer_sample = [list_sample[i:i + buffer_size] for i in range(list_buffer_sample_len)]
+
+    xs = torch.zeros(list_buffer_sample_len, buffer_size, 3, img_size[0], img_size[1])
+
+    batch_states = torch.zeros(list_buffer_sample_len, buffer_size, num_balls, 6)  # x, y, x_lin_vel, y_lin_vel, radius, label
+    for i in range(buffer_size):
+        record_img_fn = batch_records[i]
+
+        # load image and label
+        image_path = os.path.join(data_fp, record_img_fn)
+        img = Image.open(image_path).convert('RGB')
+        if not ((img.width == img_size[0]) and (img.height == img_size[1])):
+            img = img_resize(img, (img_size[0], img_size[1]), interp='bilinear')
+        # image transform, to torch float tensor 3xHxW
+        img = img_transform(img)
+
+        # put into batch arrays
+        batch_images[i][:, :img.shape[1], :img.shape[2]] = img
+
+        record_idx = extract_integer(record_img_fn)
+        for j in range(num_balls):
+            record_state = list(ball_csvs[j].iloc[record_idx][['pose_x', 'pose_y', 'vel_lin_x', 'vel_lin_y']]) \
+                           + [data_info[str(j)]['radius']] + [data_info[str(j)]['label']]
+            batch_states[i][j] = torch.FloatTensor(record_state)
+
+    output = dict()
+    output['img_data'] = batch_images
+    output['state_label'] = batch_states
+
+    return -1
+
+
+def parse_input_list(data_fp, img_prefix, buffer_size, max_sample=-1, start_idx=-1, end_idx=-1):
+    if not os.path.exists(data_fp):
+        raise NotADirectoryError
+    list_sample = []
+    fp_filter = re.compile(fr'{img_prefix}\d+.png')
+    img_fps = [fp for fp in os.listdir(data_fp) if re.match(fp_filter, fp)]
+    for fp in sorted(img_fps, key=extract_integer):
+        list_sample.append(fp)
+
+    if max_sample > 0:
+        list_sample = list_sample[0:max_sample]
+    if start_idx >= 0 and end_idx >= 0:  # divide file list
+        list_sample = list_sample[start_idx:end_idx]
+
+    num_sample = len(list_sample)
+    assert num_sample > 0
+
+    list_buffer_sample = [list_sample[i:i + buffer_size] for i in range(num_sample - buffer_size + 1)]
+
+    return list_buffer_sample
+
+
+def img_transform(img):
+    # 0-255 to 0-1
+    img = np.float32(np.array(img)) / 255.
+    img = img.transpose((2, 0, 1))
+    img = torch.from_numpy(img.copy())
+    return img
 
 
 class BaseDataset(torch.utils.data.Dataset):
@@ -165,4 +247,5 @@ class TrainMultiDataset(torch.utils.data.Dataset):
         return dataset[-1]
 
     def __len__(self):
+        # return int(1e10)  # It's a fake length due to the trick that every loader maintains its own list
         return sum([len(dataset) for dataset in self.datasets])

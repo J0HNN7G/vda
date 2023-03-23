@@ -11,15 +11,15 @@ MODEL:
 
 TRAIN:
   batch_size_per_gpu: 1
-  num_epoch: 20
+  num_epoch: 5
   start_epoch: 0
-  epoch_iters: 5000
+  epoch_iters: 80
   optim: "SGD"
   lr_perceptual: 0.02
   lr_pow: 0.9
   beta1: 0.9
   weight_decay: 1e-4
-  workers: 2
+  workers: 8
   disp_iter: 20
   seed: 304
 

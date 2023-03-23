@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+# This file is code altered from the MIT semantic segmentation repository
+# https://github.com/CSAILVision/semantic-segmentation-pytorch
+
 # System libs
 import os
 import time
@@ -9,11 +12,11 @@ import argparse
 import torch
 import torch.nn as nn
 # Our libs
-from utils.log import setup_logger, AverageMeter
+from utils.metric import setup_logger, AverageMeter
 from utils.gpu import parse_devices
 from utils.config import cfg
 from utils.dataset import TrainMultiDataset
-from utils.lib.nn import UserScatteredDataParallel, user_scattered_collate, patch_replication_callback
+from utils.models.lib import UserScatteredDataParallel, user_scattered_collate, patch_replication_callback
 from utils.models.models import ModelBuilder, PerceptualModule
 
 
@@ -130,7 +133,6 @@ def main(cfg, gpus):
                                                    weights=cfg.MODEL.weights_perceptual)
     crit = torch.nn.CrossEntropyLoss(ignore_index=-1)
     perceptual_module = PerceptualModule(optical_flow, net_perceptual, crit, buffer_size=cfg.DATASET.bufferSize)
-
 
     # Dataset and Loader
     dataset_train_fps = [os.path.join(cfg.DATASET.list_train, fp) for fp in os.listdir(cfg.DATASET.list_train)]

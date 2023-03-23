@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+# This file is code altered from the MIT semantic segmentation repository
+# https://github.com/CSAILVision/semantic-segmentation-pytorch
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
