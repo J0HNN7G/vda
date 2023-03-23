@@ -5,6 +5,7 @@
 data/diff_vis_diff_phys/*
 data/same_vis_diff_phys/*
 data/same_vis_same_phys/*
+data/EhrhardtMonszpartEtAl_UnsupervisedIntuitivePhysics_ACCV18_dataset/
 ckpt/*
 
 
