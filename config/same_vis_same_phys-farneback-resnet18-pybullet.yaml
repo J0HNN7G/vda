@@ -10,13 +10,12 @@ MODEL:
   perceptual: "resnet18"
 
 TRAIN:
-  batch_size_per_gpu: 1
-  num_epoch: 20
+  batch_size_per_gpu: 8
+  num_epoch: 10
   start_epoch: 0
   epoch_iters: 5000
   optim: "SGD"
-  lr_encoder: 0.02
-  lr_decoder: 0.02
+  lr_perceptual: 0.1
   lr_pow: 0.9
   beta1: 0.9
   weight_decay: 1e-4
