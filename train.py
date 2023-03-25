@@ -128,18 +128,23 @@ def adjust_learning_rate(optimizers, cur_iter, cfg):
 
 def main(cfg, gpus):
     optical_flow = ModelBuilder.build_optical_flow()
-    net_perceptual = ModelBuilder.build_perceptual(arch='resnet18', input_dim=13, num_classes=9,
+    input_dim = cfg.MODEL.include_images * cfg.DATASET.buffer_size * 3 \
+                + cfg.MODEL.include_optical_flow * (cfg.DATASET.buffer_size - 1) * 2
+    net_perceptual = ModelBuilder.build_perceptual(arch='resnet18', input_dim=input_dim, num_classes=cfg.DATASET.num_classes,
                                                    weights=cfg.MODEL.weights_perceptual)
     crit = torch.nn.CrossEntropyLoss(ignore_index=-1)
-    perceptual_module = PerceptualModule(optical_flow, net_perceptual, crit, buffer_size=cfg.DATASET.bufferSize)
+    perceptual_module = PerceptualModule(optical_flow, net_perceptual, crit,
+                                         buffer_size=cfg.DATASET.buffer_size,
+                                         include_images=cfg.MODEL.include_images,
+                                         include_optical_flow=cfg.MODEL.include_optical_flow)
 
     # Dataset and Loader
     dataset_train_fps = [os.path.join(cfg.DATASET.list_train, fp) for fp in os.listdir(cfg.DATASET.list_train)]
     dataset_train = TrainDataset(
         dataset_train_fps,
         batch_size_per_gpu=cfg.TRAIN.batch_size_per_gpu,
-        img_size=(256, 256),
-        buffer_size=3)
+        img_size=cfg.DATASET.img_size,
+        buffer_size=cfg.DATASET.buffer_size)
 
     loader_train = torch.utils.data.DataLoader(
         dataset_train,

@@ -1,20 +1,20 @@
 DATASET:
-  root_dataset: "./data/same_vis_same_phys"
-  list_train: "./data/same_vis_same_phys/train"
-  list_val: "./data/same_vis_same_phys/val"
+  root_dataset: "./data/predict_friction_mass_independent"
+  list_train: "./data/predict_friction_mass_independent/train"
+  list_val: "./data/predict_friction_mass_independent/val"
   img_size: (256, 256)
   buffer_size: 3
-  num_classes: 9
+  num_classes: 6
 
 MODEL:
-  optical_flow: "farneback"
+  optical_flow: "spynet"
   perceptual: "resnet18"
   include_images: True
   include_optical_flow: True
 
 TRAIN:
   batch_size_per_gpu: 8
-  num_epoch: 10
+  num_epoch: 5
   start_epoch: 0
   epoch_iters: 1000
   optim: "SGD"
@@ -34,4 +34,4 @@ TEST:
   checkpoint: "epoch_5.pth"
   result: "./"
 
-DIR: "ckpt/same_vis_same_phys-farneback-resnet18-pybullet"
+DIR: "ckpt/predict_friction_mass_independent-spynet-resnet18-pybullet"

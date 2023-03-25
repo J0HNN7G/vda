@@ -36,12 +36,15 @@ class PerceptualModuleBase(nn.Module):
 
 
 class PerceptualModule(PerceptualModuleBase):
-    def __init__(self, optical_flow, net_perceptual, crit, buffer_size):
+    def __init__(self, optical_flow, net_perceptual, crit, buffer_size, include_images, include_optical_flow):
         super(PerceptualModule, self).__init__()
+        assert (include_images or include_optical_flow)
         self.optical_flow = optical_flow
         self.net_perceptual = net_perceptual
         self.crit = crit
         self.buffer_size = buffer_size
+        self.include_images = include_images
+        self.include_optical_flow = include_optical_flow
 
     def process_feed(self, feed_dict):
         input_data = feed_dict['img_data']
@@ -50,7 +53,7 @@ class PerceptualModule(PerceptualModuleBase):
         BA, BU, _, H, W = input_data.shape
         _, _, max_num_balls, num_features = output_data.shape
         assert BU == self.buffer_size
-        C_Final = BU * 3 + (BU - 1) * 2
+        C_Final = self.include_images * BU * 3 + self.include_optical_flow * (BU - 1) * 2
 
         input_processed = torch.zeros(BA, max_num_balls, C_Final, H, W)
         output_processed = torch.zeros(BA, max_num_balls, dtype=torch.long)
@@ -59,13 +62,14 @@ class PerceptualModule(PerceptualModuleBase):
                 img_orig = input_data[i, j, ...]
                 for k in range(max_num_balls):
                     cx, cy, cr = output_data[i, j, k, [0, 1, -2]]
-                    img_masked = tensor_img_dist_circle_mask(img_orig, cx, cy, cr + 0.05)
-                    input_processed[i, k, j * 3:(j + 1) * 3, ...] = img_masked
+                    if self.include_images:
+                        img_masked = tensor_img_dist_circle_mask(img_orig, cx, cy, cr + 0.05)
+                        input_processed[i, k, j * 3:(j + 1) * 3, ...] = img_masked
 
-                    if j != BU - 1:
+                    if self.include_optical_flow and (j != BU - 1):
                         opt_flow = self.optical_flow(input_data[i][j], input_data[i][j + 1])
                         opt_flow_masked = tensor_arr_dist_circle_mask(opt_flow, cx, cy, cr)
-                        input_processed[i, k, BU * 3 + j * 2:BU * 3 + (j + 1) * 2, ...] = opt_flow_masked
+                        input_processed[i, k, self.include_images * BU * 3 + j * 2: self.include_images * BU * 3 + (j + 1) * 2, ...] = opt_flow_masked
 
                     output_processed[i, k] = output_data[i, j, k, -1]
 

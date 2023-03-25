@@ -25,6 +25,7 @@ setuptools.setup(
         'torchvision',
         'Pillow',
         'pandas',
-        'tqdm'
+        'tqdm',
+        'yacs'
     ]
 )

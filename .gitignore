@@ -6,6 +6,10 @@ data/diff_vis_diff_phys/*
 data/diff_vis_same_phys/*
 data/same_vis_diff_phys/*
 data/same_vis_same_phys/*
+data/predict_friction/*
+data/predict_mass/*
+data/predict_friction_mass_dependent/*
+data/predict_friction_mass_independent/*
 data/EhrhardtMonszpartEtAl_UnsupervisedIntuitivePhysics_ACCV18_dataset/
 ckpt/*
 

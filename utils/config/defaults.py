@@ -18,8 +18,9 @@ _C.DATASET = CN()
 _C.DATASET.root_dataset = "./data/same_vis_same_phys"
 _C.DATASET.list_train = "./data/same_vis_same_phys/train"
 _C.DATASET.list_val = "./data/same_vis_same_phys/val"
-_C.DATASET.imgSize = (256, 256)
-_C.DATASET.bufferSize = 3
+_C.DATASET.img_size = (256, 256)
+_C.DATASET.buffer_size = 3
+_C.DATASET.num_classes = 6
 
 # -----------------------------------------------------------------------------
 # Model
@@ -31,6 +32,11 @@ _C.MODEL.optical_flow = "spynet"
 _C.MODEL.perceptual = "resnet18"
 # weights to finetune perceptual model
 _C.MODEL.weights_perceptual = ""
+# include images in training
+_C.MODEL.include_images = True
+# include optical flow
+_C.MODEL.include_optical_flow = True
+
 
 # -----------------------------------------------------------------------------
 # Training

@@ -45,8 +45,10 @@ WORLD_Y_MAX = 0.5
 RAD_VALUES = np.array([0.03, 0.06, 0.09])
 # ball mass values in kilograms
 MASS_VALUES = np.array([0.2, 0.4, 0.6])
+
 # rolling friction coefficient values
-FRIC_VALUES = np.array([10**(-4), 5*10**(-4), 10**(-3)])
+#FRIC_VALUES = np.array([10 ** (-4), 5 * 10 ** (-4), 10 ** (-3)])
+FRIC_VALUES = np.array([10 ** (-4), 10 ** (-3)])
 # linear velocity range in ms⁻1
 MAX_ABS_VEL = 2.5
 # variety of colours for balls
@@ -113,6 +115,9 @@ def get_parser():
     parser.add_argument("--rand-seed", type=int, default=42,
                         help="random seed for numpy (default=42)")
 
+    parser.add_argument("--mode", default='none',
+                        help="mode for generation specific experiment data (default: 'none')")
+
     return parser
 
 
@@ -155,6 +160,7 @@ def initialize_environment(data_folder):
     env_id_dict = {'planeId': planeId, 'wallIds': [wall1Id, wall2Id, wall3Id, wall4Id]}
     return env_id_dict
 
+
 def ballProps2Label(idxs):
     """
     Converts indexes for ball properties to unique index.
@@ -183,28 +189,51 @@ def label2BallProps(idx):
     return idxs
 
 
-def initialize_balls(num_balls, same_phys, same_vis):
+def initialize_balls(num_balls, same_phys, same_vis, mode):
     """Create balls"""
 
     # randomized ball properties
-    if same_phys:
-        ball_mass_idx = np.array([np.random.randint(len(MASS_VALUES))] * num_balls, dtype=int)
-        ball_fric_idx = np.array([np.random.randint(len(FRIC_VALUES))] * num_balls, dtype=int)
-    else:
-        ball_mass_idx = np.random.randint(len(MASS_VALUES), size=num_balls, dtype=int)
+    if mode == 'none':
+        if same_phys:
+            ball_mass_idx = np.array([np.random.randint(len(MASS_VALUES))] * num_balls, dtype=int)
+            ball_fric_idx = np.array([np.random.randint(len(FRIC_VALUES))] * num_balls, dtype=int)
+        else:
+            ball_mass_idx = np.random.randint(len(MASS_VALUES), size=num_balls, dtype=int)
+            ball_fric_idx = np.random.randint(len(FRIC_VALUES), size=num_balls, dtype=int)
+        if same_vis:
+            ball_radi_idx = np.array([np.random.randint(len(RAD_VALUES))] * num_balls, dtype=int)
+            ball_color_idx = np.array([np.random.randint(len(BALL_COLOR_OPT))] * num_balls, dtype=int)
+        else:
+            ball_radi_idx = np.random.randint(len(RAD_VALUES), size=num_balls, dtype=int)
+            ball_color_idx = np.random.randint(len(BALL_COLOR_OPT), size=num_balls, dtype=int)
+        labeler = ballProps2Label
+    elif mode == 'predict_friction':
+        ball_mass_idx = np.zeros(num_balls, dtype=int)
         ball_fric_idx = np.random.randint(len(FRIC_VALUES), size=num_balls, dtype=int)
+        ball_radi_idx = np.ones(num_balls, dtype=int)
+        ball_color_idx = np.zeros(num_balls, dtype=int)
+        labeler = lambda x: x[1]
+    elif mode == 'predict_mass':
+        ball_mass_idx = ball_radi_idx = np.random.randint(min(len(MASS_VALUES), len(RAD_VALUES)), size=num_balls, dtype=int)
+        ball_fric_idx = np.zeros(num_balls, dtype=int)
+        ball_color_idx = np.zeros(num_balls, dtype=int)
+        labeler = lambda x: x[0]
+    elif mode == 'predict_friction_mass_dependent':
+        ball_mass_idx = ball_radi_idx = np.random.randint(min(len(MASS_VALUES), len(RAD_VALUES)), size=num_balls, dtype=int)
+        ball_fric_idx = ball_color_idx = np.random.randint(min(len(FRIC_VALUES), len(BALL_COLOR_OPT)), size=num_balls, dtype=int)
+        labeler = ballProps2Label
+    elif mode == 'predict_friction_mass_independent':
+        ball_mass_idx = ball_radi_idx = np.random.randint(min(len(MASS_VALUES), len(RAD_VALUES)), size=num_balls, dtype=int)
+        ball_fric_idx = np.random.randint(len(FRIC_VALUES), size=num_balls, dtype=int)
+        ball_color_idx = np.zeros(num_balls, dtype=int)
+        labeler = ballProps2Label
+    else:
+        raise NotImplementedError(f'mode not implemented: {mode}')
+
     ballMass = MASS_VALUES[ball_mass_idx]
     ballFriction = FRIC_VALUES[ball_fric_idx]
-
-    if same_vis:
-        ball_radi_idx = np.array([np.random.randint(len(RAD_VALUES))] * num_balls, dtype=int)
-        ball_color_idx = np.array([np.random.randint(len(BALL_COLOR_OPT))] * num_balls, dtype=int)
-    else:
-        ball_radi_idx = np.random.randint(len(RAD_VALUES), size=num_balls, dtype=int)
-        ball_color_idx = np.random.randint(len(BALL_COLOR_OPT), size=num_balls, dtype=int)
     ballRadi = RAD_VALUES[ball_radi_idx]
     ballColor = BALL_COLOR_OPT[ball_color_idx]
-
     ballInitLinVel = [newScale(np.append(np.random.rand(2), 0), newMin=-MAX_ABS_VEL, newMax=MAX_ABS_VEL) for _ in
                       range(num_balls)]
     ballInitAngVel = [[0, 0, 0]] * num_balls
@@ -245,7 +274,7 @@ def initialize_balls(num_balls, same_phys, same_vis):
                           linearDamping=0, angularDamping=0)
         pb.resetBaseVelocity(ballId, ballInitLinVel[i], ballInitAngVel[i])
 
-        ballPropIdx = int(ballProps2Label([ball_mass_idx[i], ball_fric_idx[i]]))
+        ballPropIdx = int(labeler([ball_mass_idx[i], ball_fric_idx[i]]))
         ballPropIdxs.append(ballPropIdx)
 
         # keeping object Id
@@ -296,12 +325,12 @@ def save_ball_infos(video_fp, csv_prefix, num_balls, ball_sim_values):
 
 
 def run_simulation(data_folder, sim_name, img_prefix, img_type, csv_prefix, json_prefix, use_gui, use_render, des_fps,
-                   duration, num_balls, same_phys, same_vis):
+                   duration, num_balls, same_phys, same_vis, mode):
     initialize_simulator(use_gui)
 
     env_id_dict = initialize_environment(data_folder)
-    ballIds, ballPropIdxs, ballColors, ballRadi, ballMass, ballFriction = initialize_balls(num_balls, same_phys,
-                                                                                           same_vis)
+    ballIds, ballPropIdxs, ballColors, ballRadi, ballMass, ballFriction = initialize_balls(num_balls, same_phys, same_vis, mode)
+
     video_fp = initialize_directory(data_folder, sim_name)
 
     save_simulation_info(video_fp, json_prefix, des_fps, num_balls, ballPropIdxs, ballColors, ballRadi, ballMass,
@@ -384,6 +413,7 @@ if __name__ == "__main__":
     num_balls = args.num_balls
     same_phys = args.same_phys
     same_vis = args.same_vis
+    mode = args.mode
 
     np.random.seed(args.rand_seed)
 
@@ -392,4 +422,4 @@ if __name__ == "__main__":
                        img_prefix, img_type,
                        csv_prefix, json_prefix,
                        use_gui, use_render,
-                       des_fps, duration, num_balls, same_phys, same_vis)
+                       des_fps, duration, num_balls, same_phys, same_vis, mode)

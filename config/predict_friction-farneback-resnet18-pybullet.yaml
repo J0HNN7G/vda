@@ -1,10 +1,10 @@
 DATASET:
-  root_dataset: "./data/same_vis_same_phys"
-  list_train: "./data/same_vis_same_phys/train"
-  list_val: "./data/same_vis_same_phys/val"
+  root_dataset: "./data/predict_friction"
+  list_train: "./data/predict_friction/train"
+  list_val: "./data/predict_friction/val"
   img_size: (256, 256)
   buffer_size: 3
-  num_classes: 9
+  num_classes: 2
 
 MODEL:
   optical_flow: "farneback"
@@ -14,7 +14,7 @@ MODEL:
 
 TRAIN:
   batch_size_per_gpu: 8
-  num_epoch: 10
+  num_epoch: 5
   start_epoch: 0
   epoch_iters: 1000
   optim: "SGD"
@@ -34,4 +34,4 @@ TEST:
   checkpoint: "epoch_5.pth"
   result: "./"
 
-DIR: "ckpt/same_vis_same_phys-farneback-resnet18-pybullet"
+DIR: "ckpt/predict_friction-farneback-resnet18-pybullet"
