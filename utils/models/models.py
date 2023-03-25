@@ -64,7 +64,7 @@ class PerceptualModule(PerceptualModuleBase):
 
                     if j != BU - 1:
                         opt_flow = self.optical_flow(input_data[i][j], input_data[i][j + 1])
-                        opt_flow_masked = tensor_arr_dist_circle_mask(opt_flow, cx, cy, cr, 0.1)
+                        opt_flow_masked = tensor_arr_dist_circle_mask(opt_flow, cx, cy, cr)
                         input_processed[i, k, BU * 3 + j * 2:BU * 3 + (j + 1) * 2, ...] = opt_flow_masked
 
                     output_processed[i, k] = output_data[i, j, k, -1]
