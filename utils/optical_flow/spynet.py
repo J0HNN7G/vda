@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+# taken from https://github.com/sniklaus/pytorch-spynet
 import math
 import torch
 
