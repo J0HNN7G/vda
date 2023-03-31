@@ -75,7 +75,7 @@ _C.VAL.batch_size = 1
 # output visualization during validation
 _C.VAL.visualize = False
 # the checkpoint to evaluate on
-_C.VAL.checkpoint = "epoch_20.pth"
+_C.VAL.checkpoint = "epoch_5.pth"
 
 # -----------------------------------------------------------------------------
 # Testing
@@ -84,6 +84,6 @@ _C.TEST = CN()
 # currently only supports 1
 _C.TEST.batch_size = 1
 # the checkpoint to test on
-_C.TEST.checkpoint = "epoch_20.pth"
+_C.TEST.checkpoint = "epoch_5.pth"
 # folder to output visualization results
 _C.TEST.result = "./"

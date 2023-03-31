@@ -35,6 +35,13 @@ def arr_circle_mask(arr, xidx, yidx, rad, default_val=0):
     return result
 
 
+def get_tensor_img_px_circle_mask_rgb(img, px, py, pr):
+    mask = torch.tensor(bool_circle_mask(img.detach().numpy(), px, py, pr))
+    masked_values = img[mask].view(3, -1)
+    rgb_values = masked_values.t()
+    return rgb_values
+
+
 def tensor_arr_dist_circle_mask(arr, cx, cy, cr, extra_pad=0.05):
     arr = arr.detach().numpy()
     xidx = int(scale2scale(cx, -1.0, 1.0, 0.0, 256.0))

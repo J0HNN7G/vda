@@ -8,7 +8,9 @@ import torch.nn.functional as F
 
 from . import resnet
 from utils.optical_flow import spynet_optical_flow, farneback_optical_flow
-from utils.mask import tensor_arr_dist_circle_mask, tensor_img_dist_circle_mask
+from utils.pose import get_circular_poses
+from utils.mask import tensor_arr_dist_circle_mask, tensor_img_dist_circle_mask, tensor_img_px_circle_mask, \
+    get_tensor_img_px_circle_mask_rgb
 
 # default input dimensions
 DEFAULT_RGB_DIM = 3
@@ -16,6 +18,9 @@ DEFAULT_RGB_DIM = 3
 DEFAULT_OPTICAL_FLOW_DIM = 2
 # default prediction classes (ImageNet)
 DEFAULT_NUM_CLASSES = 1000
+# offsets for masking
+DEFAULT_MASK_PX_OFFSET = 2
+DEFAULT_MASK_DIST_OFFSET = 0.05
 
 
 class PerceptualModuleBase(nn.Module):
@@ -45,17 +50,18 @@ class PerceptualModule(PerceptualModuleBase):
         self.buffer_size = buffer_size
         self.include_images = include_images
         self.include_optical_flow = include_optical_flow
+        self.C_Final = self.include_images * self.buffer_size * 3 + self.include_optical_flow * (
+                self.buffer_size - 1) * 2
 
-    def process_feed(self, feed_dict):
+    def training_process_feed(self, feed_dict):
         input_data = feed_dict['img_data']
         output_data = feed_dict['state_label']
 
         BA, BU, _, H, W = input_data.shape
         _, _, max_num_balls, num_features = output_data.shape
         assert BU == self.buffer_size
-        C_Final = self.include_images * BU * 3 + self.include_optical_flow * (BU - 1) * 2
 
-        input_processed = torch.zeros(BA, max_num_balls, C_Final, H, W)
+        input_processed = torch.zeros(BA, max_num_balls, self.C_Final, H, W)
         output_processed = torch.zeros(BA, max_num_balls, dtype=torch.long)
         for i in range(BA):
             for j in range(BU):
@@ -63,13 +69,15 @@ class PerceptualModule(PerceptualModuleBase):
                 for k in range(max_num_balls):
                     cx, cy, cr = output_data[i, j, k, [0, 1, -2]]
                     if self.include_images:
-                        img_masked = tensor_img_dist_circle_mask(img_orig, cx, cy, cr + 0.05)
+                        img_masked = tensor_img_dist_circle_mask(img_orig, cx, cy, cr + DEFAULT_MASK_DIST_OFFSET)
                         input_processed[i, k, j * 3:(j + 1) * 3, ...] = img_masked
 
                     if self.include_optical_flow and (j != BU - 1):
                         opt_flow = self.optical_flow(input_data[i][j], input_data[i][j + 1])
                         opt_flow_masked = tensor_arr_dist_circle_mask(opt_flow, cx, cy, cr)
-                        input_processed[i, k, self.include_images * BU * 3 + j * 2: self.include_images * BU * 3 + (j + 1) * 2, ...] = opt_flow_masked
+                        input_processed[i, k,
+                        self.include_images * BU * 3 + j * 2: self.include_images * BU * 3 + (j + 1) * 2,
+                        ...] = opt_flow_masked
 
                     output_processed[i, k] = output_data[i, j, k, -1]
 
@@ -77,20 +85,68 @@ class PerceptualModule(PerceptualModuleBase):
         output_processed = torch.flatten(output_processed, end_dim=1).cuda()
         return input_processed, output_processed
 
+    def eval_process_feed(self, feed_dict):
+        input_data = feed_dict['img_data']
+
+        BA, BU, _, H, W = input_data.shape
+        assert BA == 1  # not implemented for more
+        assert BU == self.buffer_size
+
+        poses = get_circular_poses(input_data[0, 0, ...])
+        num_balls = len(poses) # assume number of balls from first frame
+
+        input_processed = torch.zeros(1, num_balls, self.C_Final, H, W)
+        intrinsic_parameters = torch.zeros(1, num_balls, 4, dtype=torch.float)  # r, g, b, radius, mass, friction
+        extrinsic_parameters = torch.zeros(1, num_balls, 4, dtype=torch.float)
+        for j in range(BU):
+            img_orig = input_data[0, j]
+            for k in range(num_balls):
+                px, py, pr = poses[k].numpy()
+
+                if j == 0:
+                    mean_rgb = get_tensor_img_px_circle_mask_rgb(img_orig, px, py, pr).mean(axis=0).numpy()
+                    intrinsic_parameters[0, k, :] = torch.FloatTensor(
+                        [mean_rgb[0], mean_rgb[1], mean_rgb[2], pr])
+
+                if self.include_images:
+                    img_masked = tensor_img_px_circle_mask(img_orig, px, py, pr + DEFAULT_MASK_PX_OFFSET)
+                    input_processed[0, k, j * 3:(j + 1) * 3, ...] = img_masked
+
+                opt_flow = self.optical_flow(input_data[0, j], input_data[0, j + 1])
+                if self.include_optical_flow and (j != BU - 1):
+                    opt_flow_masked = tensor_img_px_circle_mask(opt_flow, px, py, pr)
+                    input_processed[0, k,
+                    self.include_images * BU * 3 + j * 2: self.include_images * BU * 3 + (j + 1) * 2,
+                    ...] = opt_flow_masked
+
+                vx, vy = opt_flow[:, px, py].numpy()
+                poses[k, ...] = torch.FloatTensor([px + vx, py + vy, pr])
+                if j == BU - 1:
+                    extrinsic_parameters[0, k, :] = torch.FloatTensor([px, py, vx, vy])
+
+        input_processed = torch.flatten(input_processed, end_dim=1).cuda()
+        intrinsic_parameters = torch.flatten(intrinsic_parameters, end_dim=1)
+        extrinsic_parameters = torch.flatten(extrinsic_parameters, end_dim=1)
+        return input_processed, intrinsic_parameters, extrinsic_parameters
+
     def forward(self, feed):
         if isinstance(feed, list):
             feed = feed[0]
 
-        samples, labels = self.process_feed(feed)
-        output = self.net_perceptual(samples)
-        prediction = self.label_pred(output)
-
         if self.training:
+            samples, labels = self.training_process_feed(feed)
+            output = self.net_perceptual(samples)
+            prediction = self.label_pred(output)
+
             loss = self.crit(output, labels)
             acc = self.label_acc(prediction, labels)
             return loss, acc
         else:
-            return prediction
+            samples, intrinsic_params, extrinsic_params = self.eval_process_feed(feed)
+            output = self.net_perceptual(samples)
+            predicted_params = self.label_pred(output)
+
+            return predicted_params, intrinsic_params, extrinsic_params
 
 
 class ModelBuilder:

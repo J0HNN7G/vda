@@ -10,6 +10,8 @@ import time
 import json
 import argparse
 
+from utils.mask import scale2scale
+
 # project directory
 PROJECT_DIR = '/home/jonathan/Documents/diss/intuitive_physics/data'
 
@@ -31,6 +33,13 @@ CAM_PROJECTION_MATRIX = pb.computeProjectionMatrixFOV(
     aspect=1.0,
     nearVal=0.1,
     farVal=3.1)
+
+DEFAULT_LIGHT_DIRECTION = [0, 0, 4]
+
+# spawning balls slightly above floor
+SURFACE_SPHERE_OFFSET = 0.01
+# dfa
+DEFAULT_RESTITUTION = 0.9
 
 # minimum x in metres for urdf bounds
 WORLD_X_MIN = -0.5
@@ -119,14 +128,6 @@ def get_parser():
                         help="mode for generation specific experiment data (default: 'none')")
 
     return parser
-
-
-def newScale(oldValue, oldMin=0, oldMax=1, newMin=-1, newMax=1):
-    """Change value to different linear scale"""
-    oldRange = (oldMax - oldMin)
-    newRange = (newMax - newMin)
-    newValue = (((oldValue - oldMin) * newRange) / oldRange) + newMin
-    return newValue
 
 
 def initialize_simulator(use_gui):
@@ -234,7 +235,7 @@ def initialize_balls(num_balls, same_phys, same_vis, mode):
     ballFriction = FRIC_VALUES[ball_fric_idx]
     ballRadi = RAD_VALUES[ball_radi_idx]
     ballColor = BALL_COLOR_OPT[ball_color_idx]
-    ballInitLinVel = [newScale(np.append(np.random.rand(2), 0), newMin=-MAX_ABS_VEL, newMax=MAX_ABS_VEL) for _ in
+    ballInitLinVel = [scale2scale(np.append(np.random.rand(2), 0), newMin=-MAX_ABS_VEL, newMax=MAX_ABS_VEL) for _ in
                       range(num_balls)]
     ballInitAngVel = [[0, 0, 0]] * num_balls
 
@@ -248,9 +249,9 @@ def initialize_balls(num_balls, same_phys, same_vis, mode):
         while not allSafePos:
             # new position guaranteed not to overlap with walls
             initPos = np.array(
-                [newScale(np.random.rand(), newMin=WORLD_X_MIN + ballRadi[i], newMax=WORLD_X_MAX - ballRadi[i]),
-                 newScale(np.random.rand(), newMin=WORLD_Y_MIN + ballRadi[i], newMax=WORLD_Y_MAX - ballRadi[i]),
-                 ballRadi[i] + 0.01])
+                [scale2scale(np.random.rand(), newMin=WORLD_X_MIN + ballRadi[i], newMax=WORLD_X_MAX - ballRadi[i]),
+                 scale2scale(np.random.rand(), newMin=WORLD_Y_MIN + ballRadi[i], newMax=WORLD_Y_MAX - ballRadi[i]),
+                 ballRadi[i] + SURFACE_SPHERE_OFFSET])
             # check if overlaps with other balls
             isSafePos = True
             for j in range(i):
@@ -270,7 +271,7 @@ def initialize_balls(num_balls, same_phys, same_vis, mode):
                                     baseVisualShapeIndex=visualBallId,
                                     basePosition=ballInitPos[i])
         # set object properties
-        pb.changeDynamics(ballId, -1, rollingFriction=ballFriction[i], contactProcessingThreshold=0, restitution=0.9,
+        pb.changeDynamics(ballId, -1, rollingFriction=ballFriction[i], contactProcessingThreshold=0, restitution=DEFAULT_RESTITUTION,
                           linearDamping=0, angularDamping=0)
         pb.resetBaseVelocity(ballId, ballInitLinVel[i], ballInitAngVel[i])
 
@@ -372,7 +373,7 @@ def run_simulation(data_folder, sim_name, img_prefix, img_type, csv_prefix, json
                     height=256,
                     viewMatrix=CAM_VIEW_MATRIX,
                     projectionMatrix=CAM_PROJECTION_MATRIX,
-                    lightDirection=[0, 0, 4])
+                    lightDirection=DEFAULT_LIGHT_DIRECTION)
                 # save image
                 im = Image.fromarray(rgbImg)
                 img_name = f"{img_prefix}{curr_num_des_frames}{img_type}"

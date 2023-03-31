@@ -30,6 +30,15 @@ def extract_integer(filename):
     return int(filename.split('.')[0].split('_')[1])
 
 
+def img_transform(img):
+    # 0-255 to 0-1
+    img = np.float32(np.array(img)) / 255.
+    img = img.transpose((2, 0, 1))
+    # img = self.normalize(torch.from_numpy(img.copy()))
+    img = torch.from_numpy(img.copy())
+    return img
+
+
 class BaseDataset(torch.utils.data.Dataset):
     def __init__(self, data_fps, img_size, buffer_size, info_prefix='info', ball_csv_prefix='ball_',
                  img_prefix='timestep_', **kwargs):
@@ -106,14 +115,6 @@ class BaseDataset(torch.utils.data.Dataset):
                 count += self.num_samples[i]
         return tuple(idxs)
 
-    def img_transform(self, img):
-        # 0-255 to 0-1
-        img = np.float32(np.array(img)) / 255.
-        img = img.transpose((2, 0, 1))
-        # img = self.normalize(torch.from_numpy(img.copy()))
-        img = torch.from_numpy(img.copy())
-        return img
-
 
 class TrainDataset(BaseDataset):
     def __init__(self, data_fp, batch_size_per_gpu, img_size, buffer_size, **kwargs):
@@ -155,7 +156,7 @@ class TrainDataset(BaseDataset):
                 if not ((img.width == self.img_size[0]) and (img.height == self.img_size[1])):
                     img = img_resize(img, (self.img_size[0], self.img_size[1]), interp='bilinear')
                 # image transform, to torch float tensor 3xHxW
-                img = self.img_transform(img)
+                img = img_transform(img)
 
                 # put into batch arrays
                 batch_images[bidx, i][:, :img.shape[1], :img.shape[2]] = img
