@@ -12,6 +12,8 @@ from utils.pose import get_circular_poses
 from utils.mask import tensor_arr_dist_circle_mask, tensor_img_dist_circle_mask, tensor_img_px_circle_mask, \
     get_tensor_img_px_circle_mask_rgb
 
+from utils.visualization import show_farneback_optical_flows
+
 # default input dimensions
 DEFAULT_RGB_DIM = 3
 # default optical flow dimensions
@@ -75,9 +77,10 @@ class PerceptualModule(PerceptualModuleBase):
                     if self.include_optical_flow and (j != BU - 1):
                         opt_flow = self.optical_flow(input_data[i][j], input_data[i][j + 1])
                         opt_flow_masked = tensor_arr_dist_circle_mask(opt_flow, cx, cy, cr)
-                        input_processed[i, k,
-                        self.include_images * BU * 3 + j * 2: self.include_images * BU * 3 + (j + 1) * 2,
-                        ...] = opt_flow_masked
+
+                        c_start_idx = self.include_images * BU * 3 + j * 2
+                        c_end_idx = self.include_images * BU * 3 + (j + 1) * 2
+                        input_processed[i, k, c_start_idx:c_end_idx, ...] = opt_flow_masked
 
                     output_processed[i, k] = output_data[i, j, k, -1]
 
@@ -92,34 +95,36 @@ class PerceptualModule(PerceptualModuleBase):
         assert BA == 1  # not implemented for more
         assert BU == self.buffer_size
 
-        poses = get_circular_poses(input_data[0, 0, ...])
-        num_balls = len(poses) # assume number of balls from first frame
+        poses = get_circular_poses(input_data[0, 0, ...].cpu())
+        num_balls = len(poses)  # assume number of balls from first frame
 
         input_processed = torch.zeros(1, num_balls, self.C_Final, H, W)
-        intrinsic_parameters = torch.zeros(1, num_balls, 4, dtype=torch.float)  # r, g, b, radius, mass, friction
+        intrinsic_parameters = torch.zeros(1, num_balls, 6, dtype=torch.float)  # r, g, b, radius, mass, friction
         extrinsic_parameters = torch.zeros(1, num_balls, 4, dtype=torch.float)
         for j in range(BU):
-            img_orig = input_data[0, j]
+            img_orig = input_data[0, j].cpu()
             for k in range(num_balls):
                 px, py, pr = poses[k].numpy()
 
                 if j == 0:
                     mean_rgb = get_tensor_img_px_circle_mask_rgb(img_orig, px, py, pr).mean(axis=0).numpy()
                     intrinsic_parameters[0, k, :] = torch.FloatTensor(
-                        [mean_rgb[0], mean_rgb[1], mean_rgb[2], pr])
+                        [mean_rgb[0], mean_rgb[1], mean_rgb[2], pr, -1, -1])
 
                 if self.include_images:
                     img_masked = tensor_img_px_circle_mask(img_orig, px, py, pr + DEFAULT_MASK_PX_OFFSET)
                     input_processed[0, k, j * 3:(j + 1) * 3, ...] = img_masked
 
-                opt_flow = self.optical_flow(input_data[0, j], input_data[0, j + 1])
                 if self.include_optical_flow and (j != BU - 1):
+                    opt_flow = self.optical_flow(img_orig, input_data[0, j + 1].cpu())
                     opt_flow_masked = tensor_img_px_circle_mask(opt_flow, px, py, pr)
-                    input_processed[0, k,
-                    self.include_images * BU * 3 + j * 2: self.include_images * BU * 3 + (j + 1) * 2,
-                    ...] = opt_flow_masked
 
-                vx, vy = opt_flow[:, px, py].numpy()
+                    c_idx_start = self.include_images * BU * 3 + j * 2
+                    c_idx_end = self.include_images * BU * 3 + (j + 1) * 2
+                    input_processed[0, k, c_idx_start:c_idx_end, ...] = opt_flow_masked
+
+                # updating poses
+                vx, vy = opt_flow[:, int(py), int(px)].numpy()
                 poses[k, ...] = torch.FloatTensor([px + vx, py + vy, pr])
                 if j == BU - 1:
                     extrinsic_parameters[0, k, :] = torch.FloatTensor([px, py, vx, vy])

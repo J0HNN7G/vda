@@ -8,10 +8,12 @@ import argparse
 # Numerical libs
 import torch
 from tqdm import tqdm
+from PIL import Image
 # Our libs
 from utils.metric import setup_logger
 from utils.config import cfg
 from utils.dataset import TestDataset
+from utils.pose import tensor_to_cv2
 from utils.models.lib import user_scattered_collate, async_copy_to
 from utils.models.models import ModelBuilder, PerceptualModule
 from utils.physics.simulators import PhysicsEngineBuilder
@@ -19,26 +21,40 @@ from utils.graphics.renderers import GraphicsEngineBuilder
 from data.data_gen import label2BallProps, MASS_VALUES, FRIC_VALUES
 
 
-def test(perceptual_module, physics_engine, graphics_engine, loader, gpu):
+def save_output(img, buffer, step, cfg):
+    img = tensor_to_cv2(img)
+    output_fp = os.path.join(cfg.TEST.result, f'buffer_{buffer}_timestep_{step}.png')
+    Image.fromarray(img).save(output_fp)
+
+
+def test(perceptual_module, physics_engine, graphics_engine, loader, gpu, cfg):
     perceptual_module.eval()
 
+    max_steps = max(cfg.TEST.prediction_timesteps)
+
     pbar = tqdm(total=len(loader))
-    for batch_data in loader:
+    for buffer_idx, batch_data in enumerate(loader):
         # process data
         batch_data = batch_data[0]
 
         with torch.no_grad():
+            feed_dict = batch_data.copy()
             feed_dict = async_copy_to(feed_dict, gpu)
             predicted_params, intrinsic_params, extrinsic_params = perceptual_module(feed_dict)
-            predicted_param_idxs = label2BallProps(predicted_params[0])
 
-        physics_engine.start()
-        physics_engine.init_environment()
-        physics_engine.init_objects(intrinsic_parameters=, extrinsic_parameters=extrinsic_params)
-        physics_engine.init_timestep()
-        physics_engine.step()
-        extrinsic_params = physics_engine.get_extrinsic_parameters()
-        img = graphics_engine.get_img()
+        num_balls = len(predicted_params)
+        for j in range(num_balls):
+            predicted_param_idxs = label2BallProps(predicted_params[j])
+            intrinsic_params[j, -2] = MASS_VALUES[predicted_param_idxs[0]]
+            intrinsic_params[j, -1] = FRIC_VALUES[predicted_param_idxs[1]]
+
+        physics_engine.start(intrinsic_params, extrinsic_params)
+        for step in range(max_steps):
+            #print(step, physics_engine.get_extrinsic_parameters())
+            physics_engine.step()
+            if (step+1) in cfg.TEST.prediction_timesteps:
+                img = graphics_engine.get_img()
+                save_output(img, buffer_idx, step + 1, cfg)
         physics_engine.stop()
 
         pbar.update(1)
@@ -47,10 +63,11 @@ def test(perceptual_module, physics_engine, graphics_engine, loader, gpu):
 def main(cfg, gpu):
     torch.cuda.set_device(gpu)
 
-    optical_flow = ModelBuilder.build_optical_flow()
+    optical_flow = ModelBuilder.build_optical_flow(cfg.MODEL.optical_flow)
     input_dim = cfg.MODEL.include_images * cfg.DATASET.buffer_size * 3 \
                 + cfg.MODEL.include_optical_flow * (cfg.DATASET.buffer_size - 1) * 2
-    net_perceptual = ModelBuilder.build_perceptual(arch='resnet18', input_dim=input_dim, num_classes=cfg.DATASET.num_classes,
+    net_perceptual = ModelBuilder.build_perceptual(arch='resnet18', input_dim=input_dim,
+                                                   num_classes=cfg.DATASET.num_classes,
                                                    weights=cfg.MODEL.weights_perceptual)
     crit = torch.nn.CrossEntropyLoss(ignore_index=-1)
     perceptual_module = PerceptualModule(optical_flow, net_perceptual, crit,
@@ -58,35 +75,24 @@ def main(cfg, gpu):
                                          include_images=cfg.MODEL.include_images,
                                          include_optical_flow=cfg.MODEL.include_optical_flow)
 
+    physics_engine = PhysicsEngineBuilder.build_physics_engine(cfg.TEST.physics_engine, cfg)
+
+    graphics_engine = GraphicsEngineBuilder.build_graphics_engine(cfg.TEST.graphics_engine, cfg, physics_engine)
 
     # Dataset and Loader
-    dataset_test_fps = [os.path.join(cfg.DATASET.list_test, fp) for fp in os.listdir(cfg.DATASET.list_test)]
-    dataset_test = TestDataset(
-        dataset_test_fps,
-        cfg.DATASET)
+    dataset_test = TestDataset(cfg)
 
     loader_test = torch.utils.data.DataLoader(
         dataset_test,
         batch_size=cfg.TEST.batch_size,
         shuffle=False,
         collate_fn=user_scattered_collate,
-        num_workers=5,
         drop_last=True)
 
     perceptual_module.cuda()
-    physics_engine = PhysicsEngineBuilder.build_physics_engine(cfg.TEST.physics_engine)
-    graphics_engine = GraphicsEngineBuilder.build_graphics_engine(cfg.TEST.graphics_engine)
-
-    if cfg.TEST.physics_engine == 'pybullet':
-        physics_engine.init_fps(cfg.TEST.fps)
-        physics_engine.init_urdf_folder(cfg.TEST.urdf_folder)
-
-        graphics_engine.set_physics_engine(physics_engine)
-        graphics_engine.set_img_size(cfg.DATASET.img_size)
-
 
     # Main loop
-    test(perceptual_module, physics_engine, graphics_engine, loader_test, gpu)
+    test(perceptual_module, physics_engine, graphics_engine, loader_test, gpu, cfg)
 
     print('Inference done!')
 
@@ -135,6 +141,9 @@ if __name__ == '__main__':
     # absolute paths of model weights
     cfg.MODEL.weights_perceptual = os.path.join(
         cfg.DIR, 'perceptual_' + cfg.TEST.checkpoint)
+
+    # generate testing image list
+    cfg.TEST.list_test = args.imgs
 
     assert os.path.exists(cfg.MODEL.weights_perceptual), "checkpoint does not exist!"
 

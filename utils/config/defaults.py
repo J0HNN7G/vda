@@ -37,7 +37,6 @@ _C.MODEL.include_images = True
 # include optical flow
 _C.MODEL.include_optical_flow = True
 
-
 # -----------------------------------------------------------------------------
 # Training
 # -----------------------------------------------------------------------------
@@ -86,4 +85,14 @@ _C.TEST.batch_size = 1
 # the checkpoint to test on
 _C.TEST.checkpoint = "epoch_5.pth"
 # folder to output visualization results
-_C.TEST.result = "./"
+_C.TEST.result = "./results"
+# physics engine for dynamics
+_C.TEST.physics_engine = "pybullet"
+# graphics engine for rendering
+_C.TEST.graphics_engine = "pybullet"
+# simulation frames per second
+_C.TEST.fps = 30
+# where all URDF files are stored
+_C.TEST.urdf_folder = './data'
+# prediction steps to output files for
+_C.TEST.prediction_timesteps = [1, 5, 10, 20]

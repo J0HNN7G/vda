@@ -7,10 +7,12 @@ import json
 import re
 
 import torch
-from torchvision import transforms
 from PIL import Image
 import pandas as pd
 import numpy as np
+
+TEST_BUFFER_PREFIX = 'buffer'
+TEST_TIMESTEP_PREFIX = 'timestep'
 
 
 def img_resize(img, size, interp='bilinear'):
@@ -30,11 +32,17 @@ def extract_integer(filename):
     return int(filename.split('.')[0].split('_')[1])
 
 
+def extract_integers(filename):
+    split_list = filename.split('.')[0].split('_')
+    int1 = split_list[1]
+    int2 = split_list[3]
+    return int(f'{int1}{int2}')
+
+
 def img_transform(img):
     # 0-255 to 0-1
     img = np.float32(np.array(img)) / 255.
     img = img.transpose((2, 0, 1))
-    # img = self.normalize(torch.from_numpy(img.copy()))
     img = torch.from_numpy(img.copy())
     return img
 
@@ -69,11 +77,6 @@ class BaseDataset(torch.utils.data.Dataset):
 
         self.all_same_size = all(self.num_samples[0] == x for x in self.num_samples)
         self.idxs = list(range(sum(self.num_samples)))
-
-        # mean and std
-        self.normalize = transforms.Normalize(
-            mean=[0.485, 0.456, 0.406],
-            std=[0.229, 0.224, 0.225])
 
     def parse_input_list(self, data_fp, img_prefix, max_sample=-1, start_idx=-1, end_idx=-1):
         if not os.path.exists(data_fp):
@@ -175,3 +178,86 @@ class TrainDataset(BaseDataset):
     def __len__(self):
         return int(1e10)
         # return sum(self.num_samples)
+
+
+class TestDataset(torch.utils.data.Dataset):
+    def __init__(self, cfg, **kwargs):
+        super(TestDataset, self).__init__(**kwargs)
+        self.cur_idx = -1
+        self.img_size = cfg.DATASET.img_size
+        self.buffer_size = cfg.DATASET.buffer_size
+
+        self.data_fp = cfg.TEST.list_test
+        self.list_buffer_samples = None
+        self.num_samples = -1
+
+        # parse the image files
+        self.parse_input_list(**kwargs)
+        print(f'# buffer samples: {self.num_samples - self.buffer_size}')
+
+    def parse_input_list(self, max_sample=-1, start_idx=-1, end_idx=-1):
+        if not os.path.exists(self.data_fp):
+            raise NotADirectoryError
+        list_sample = []
+        fp_filter = re.compile(fr'{TEST_BUFFER_PREFIX}_\d+_{TEST_TIMESTEP_PREFIX}_\d+.png')
+        img_fps = [fp for fp in os.listdir(self.data_fp) if re.match(fp_filter, fp)]
+        for fp in sorted(img_fps, key=extract_integers):
+            list_sample.append(fp)
+
+        if max_sample > 0:
+            list_sample = list_sample[0:max_sample]
+        if start_idx >= 0 and end_idx >= 0:  # divide file list
+            list_sample = list_sample[start_idx:end_idx]
+
+        num_sample = len(list_sample) // self.buffer_size
+        assert num_sample > 0
+        self.num_samples = num_sample
+        self.list_buffer_samples = [list_sample[i * self.buffer_size:(i+1) * self.buffer_size] for i in range(num_sample)]
+        assert self.check_buffer_list(self.list_buffer_samples)
+
+    def check_buffer_list(self, input_list):
+        for buffer_idx, buffer in enumerate(input_list):
+            # check buffer corresponds to model
+            if len(buffer) != self.buffer_size:
+                return False
+
+            previous_timestep = -1
+            for timestep_file in buffer:
+                file_parts = timestep_file.split('_')
+                current_buffer = int(file_parts[1])
+                current_timestep = int(file_parts[3].split('.')[0])
+
+                # check buffer ordering is correct
+                if current_buffer != buffer_idx or current_timestep != previous_timestep + 1:
+                    return False
+                previous_timestep = current_timestep
+        return True
+
+    def __getitem__(self, index):
+        batch_images = torch.zeros(1, self.buffer_size, 3, self.img_size[0], self.img_size[1])
+
+        self.cur_idx += 1
+        if self.cur_idx >= self.num_samples:
+            self.cur_idx = 0
+
+        batch_records = self.list_buffer_samples[self.cur_idx]
+
+        for i in range(self.buffer_size):
+            record_img_fn = batch_records[i]
+
+            # load image and label
+            image_path = os.path.join(self.data_fp, record_img_fn)
+            img = Image.open(image_path).convert('RGB')
+            if not ((img.width == self.img_size[0]) and (img.height == self.img_size[1])):
+                img = img_resize(img, (self.img_size[0], self.img_size[1]), interp='bilinear')
+            # image transform, to torch float tensor 3xHxW
+            img = img_transform(img)
+            # put into batch arrays
+            batch_images[0, i][:, :img.shape[1], :img.shape[2]] = img
+
+        output = dict()
+        output['img_data'] = batch_images
+        return output
+
+    def __len__(self):
+        return self.num_samples

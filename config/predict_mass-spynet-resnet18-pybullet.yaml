@@ -32,6 +32,6 @@ VAL:
 
 TEST:
   checkpoint: "epoch_5.pth"
-  result: "./"
+  result: "./results"
 
 DIR: "ckpt/predict_mass-spynet-resnet18-pybullet"

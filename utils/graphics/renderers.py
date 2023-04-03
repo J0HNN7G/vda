@@ -12,10 +12,11 @@ from utils.dataset import img_transform
 
 class GraphicsEngineBuilder:
     @staticmethod
-    def build_graphics_engine(arch='pybullet', weights='', **kwargs):
+    def build_graphics_engine(arch='pybullet', cfg=None, physics_engine=None, weights='', **kwargs):
         arch = arch.lower()
         if arch == 'pybullet':
-            graphics_engine = PyBulletEngine()
+            assert cfg and physics_engine
+            graphics_engine = PyBulletGraphicsEngine(cfg, physics_engine)
         else:
             raise Exception('Architecture undefined!')
         return graphics_engine
@@ -41,16 +42,10 @@ class BaseGraphicsEngine(ABC):
         ...
 
 
-class PyBulletEngine(BaseGraphicsEngine, ABC):
-    def __init__(self):
-        self.physics_engine = None
-        self.img_size = None
-
-    def set_physics_engine(self, pb_physics_engine):
-        self.physics_engine = pb_physics_engine
-
-    def set_img_size(self, img_size):
-        self.img_size = img_size
+class PyBulletGraphicsEngine(BaseGraphicsEngine, ABC):
+    def __init__(self, cfg, physics_engine):
+        self.physics_engine = physics_engine
+        self.img_size = cfg.DATASET.img_size
 
     def init_environment(self, **kwargs):
         pass
@@ -62,8 +57,7 @@ class PyBulletEngine(BaseGraphicsEngine, ABC):
         pass
 
     def get_img(self, **kwargs):
-        assert self.physics_engine.physicsClientId
-        assert self.img_size
+        assert self.physics_engine.physicsClientId is not None
         _, _, rgbImg, _, _ = pb.getCameraImage(
             width=self.img_size[0],
             height=self.img_size[1],

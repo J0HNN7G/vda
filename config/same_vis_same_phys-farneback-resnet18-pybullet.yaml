@@ -16,7 +16,7 @@ TRAIN:
   batch_size_per_gpu: 8
   num_epoch: 10
   start_epoch: 0
-  epoch_iters: 1000
+  epoch_iters: 10
   optim: "SGD"
   lr_perceptual: 0.1
   lr_pow: 0.9
@@ -32,6 +32,11 @@ VAL:
 
 TEST:
   checkpoint: "epoch_5.pth"
-  result: "./"
+  result: "./results"
+  physics_engine: "pybullet"
+  graphics_engine: "pybullet"
+  fps: 30
+  urdf_folder: './data'
+  prediction_timesteps: [1,5,10,20]
 
 DIR: "ckpt/same_vis_same_phys-farneback-resnet18-pybullet"
