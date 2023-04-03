@@ -12,7 +12,7 @@ data/predict_friction_mass_dependent/*
 data/predict_friction_mass_independent/*
 data/EhrhardtMonszpartEtAl_UnsupervisedIntuitivePhysics_ACCV18_dataset/
 ckpt/*
-
+results/*
 
 ### C++ ###
 # Prerequisites
