@@ -3,9 +3,9 @@
 # do this first
 #source $HOME/Documents/diss/intuitive_physics/env/bin/activate
 
-python3 data_gen.py --data-folder predict_friction/train --rand-seed 5924 --num-sims 9000 --mode "predict_friction"
-python3 data_gen.py --data-folder predict_friction/val --rand-seed 6621 --num-sims 200 --mode "predict_friction"
-python3 data_gen.py --data-folder predict_friction/test --rand-seed 7645 --num-sims 200 --mode "predict_friction"
+python3 data_gen.py --data-folder predict_friction_lol/train --rand-seed 5924 --num-sims 9000 --mode "predict_friction"
+python3 data_gen.py --data-folder predict_friction_lol/val --rand-seed 6621 --num-sims 200 --mode "predict_friction"
+python3 data_gen.py --data-folder predict_friction_lol/test --rand-seed 7645 --num-sims 200 --mode "predict_friction"
 
 python3 data_gen.py --data-folder predict_mass/train --rand-seed 4313 --num-sims 9000 --mode "predict_mass"
 python3 data_gen.py --data-folder predict_mass/val --rand-seed 6212 --num-sims 200 --mode "predict_mass"

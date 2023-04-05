@@ -5,7 +5,6 @@ from abc import ABC, abstractmethod
 
 import math
 
-
 # PyBullet engine
 import pybullet as pb
 import torch
@@ -47,8 +46,8 @@ class BasePhysicsEngine(ABC):
 
 class PyBulletPhysicsEngine(BasePhysicsEngine, ABC):
     def __init__(self, cfg):
-        self.urdf_folder = cfg.TEST.urdf_folder
-        self.desired_fps = cfg.TEST.fps
+        self.urdf_folder = cfg.DATASET.urdf_folder
+        self.desired_fps = cfg.DATASET.fps
         self.physicsClientId = None
         self.env_id_dict = None
         self.objIds = None
@@ -100,10 +99,10 @@ class PyBulletPhysicsEngine(BasePhysicsEngine, ABC):
             cx = scale2scale(px, 0.0, 256.0, -1.0, 1.0)
             cy = scale2scale(py, 0.0, 256.0, 1.0, -1.0)  # check if this actually does what it supposed to
             cr = scale2scale(pr, 0.0, 256.0 // 2, 0.0, 1.0)
-            
-            cvx = pvx / 256.0 * self.desired_fps * 2 # figure out the scaling factor
+
+            cvx = pvx / 256.0 * self.desired_fps * 2  # figure out the scaling factor
             cvy = - pvy / 256.0 * self.desired_fps * 2
-            
+
             # adding balls to simulation
             colBallId = pb.createCollisionShape(pb.GEOM_SPHERE, radius=cr)
             visualBallId = pb.createVisualShape(pb.GEOM_SPHERE, radius=cr, rgbaColor=[r, g, b, 1.0])
@@ -133,6 +132,13 @@ class PyBulletPhysicsEngine(BasePhysicsEngine, ABC):
         for i in range(len(self.objIds)):
             x, y = pb.getBasePositionAndOrientation(self.objIds[i], physicsClientId=self.physicsClientId)[0][:2]
             vx, vy = pb.getBaseVelocity(self.objIds[i])[0][:2]
+
+            x = scale2scale(x, -1.0, 1.0, 0.0, 256.0)
+            y = scale2scale(y, -1.0, 1.0, 256.0, 0.0)
+            vx = vx * 256.0 / (self.desired_fps * 2)
+            vy = - vy * 256.0 / (self.desired_fps * 2)
+
             extrinsic_parameters[i, ...] = torch.FloatTensor([x, y, vx, vy])
+        # print(extrinsic_parameters)
 
         return extrinsic_parameters

@@ -21,6 +21,10 @@ _C.DATASET.list_val = "./data/same_vis_same_phys/val"
 _C.DATASET.img_size = (256, 256)
 _C.DATASET.buffer_size = 3
 _C.DATASET.num_classes = 6
+# simulation frames per second
+_C.DATASET.fps = 30
+# where all URDF files are stored
+_C.DATASET.urdf_folder = './data'
 
 # -----------------------------------------------------------------------------
 # Model
@@ -71,10 +75,10 @@ _C.TRAIN.seed = 304
 _C.VAL = CN()
 # currently only supports 1
 _C.VAL.batch_size = 1
-# output visualization during validation
-_C.VAL.visualize = False
 # the checkpoint to evaluate on
 _C.VAL.checkpoint = "epoch_5.pth"
+# prediction steps to
+_C.VAL.prediction_timesteps = [1, 5, 10, 20, 40, 50, 57]
 
 # -----------------------------------------------------------------------------
 # Testing
@@ -90,9 +94,5 @@ _C.TEST.result = "./results"
 _C.TEST.physics_engine = "pybullet"
 # graphics engine for rendering
 _C.TEST.graphics_engine = "pybullet"
-# simulation frames per second
-_C.TEST.fps = 30
-# where all URDF files are stored
-_C.TEST.urdf_folder = './data'
 # prediction steps to output files for
 _C.TEST.prediction_timesteps = [1, 5, 10, 20]

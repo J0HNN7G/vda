@@ -10,7 +10,6 @@ import time
 import json
 import argparse
 
-from utils.mask import scale2scale
 
 # project directory
 PROJECT_DIR = '/home/jonathan/Documents/diss/intuitive_physics/data'
@@ -72,6 +71,22 @@ BALL_SIM_COL_NAMES = ['timestep', 'pose_x', 'pose_y', 'pose_z',
                       'pose_rx', 'pose_ry', 'pose_rz', 'pose_rw',
                       'vel_lin_x', 'vel_lin_y', 'vel_lin_z',
                       'vel_ang_x', 'vel_ang_y', 'vel_ang_z']
+
+
+def scale2scale(value, oldMin=-1.0, oldMax=1.0, newMin=-1.0, newMax=1.0):
+    """
+    Convert linear scale (min/max) to another linear scale (min/max)
+    value: value to be converted
+    oldMin: old minimum value
+    oldMax: old maximum value
+    newMin: new minimum value
+    newMax: new maximum value
+    return: value mapped from old range to new range
+    """
+    oSpan = oldMax - oldMin
+    nSpan = newMax - newMin
+    result = ((value - oldMin) / oSpan) * nSpan + newMin
+    return result
 
 
 def get_parser():
@@ -235,7 +250,7 @@ def initialize_balls(num_balls, same_phys, same_vis, mode):
     ballFriction = FRIC_VALUES[ball_fric_idx]
     ballRadi = RAD_VALUES[ball_radi_idx]
     ballColor = BALL_COLOR_OPT[ball_color_idx]
-    ballInitLinVel = [scale2scale(np.append(np.random.rand(2), 0), newMin=-MAX_ABS_VEL, newMax=MAX_ABS_VEL) for _ in
+    ballInitLinVel = [scale2scale(np.append(np.random.rand(2), 0)) for _ in
                       range(num_balls)]
     ballInitAngVel = [[0, 0, 0]] * num_balls
 
@@ -249,8 +264,8 @@ def initialize_balls(num_balls, same_phys, same_vis, mode):
         while not allSafePos:
             # new position guaranteed not to overlap with walls
             initPos = np.array(
-                [scale2scale(np.random.rand(), newMin=WORLD_X_MIN + ballRadi[i], newMax=WORLD_X_MAX - ballRadi[i]),
-                 scale2scale(np.random.rand(), newMin=WORLD_Y_MIN + ballRadi[i], newMax=WORLD_Y_MAX - ballRadi[i]),
+                [scale2scale(np.random.rand()),
+                 scale2scale(np.random.rand()),
                  ballRadi[i] + SURFACE_SPHERE_OFFSET])
             # check if overlaps with other balls
             isSafePos = True

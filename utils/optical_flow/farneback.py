@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import cv2
 import torch
+import numpy as np
 
 from utils.pose import tensor_to_cv2
 

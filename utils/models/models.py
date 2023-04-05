@@ -88,7 +88,7 @@ class PerceptualModule(PerceptualModuleBase):
         output_processed = torch.flatten(output_processed, end_dim=1).cuda()
         return input_processed, output_processed
 
-    def eval_process_feed(self, feed_dict):
+    def eval_process_feed2(self, feed_dict):
         input_data = feed_dict['img_data']
 
         BA, BU, _, H, W = input_data.shape
@@ -128,6 +128,58 @@ class PerceptualModule(PerceptualModuleBase):
                 poses[k, ...] = torch.FloatTensor([px + vx, py + vy, pr])
                 if j == BU - 1:
                     extrinsic_parameters[0, k, :] = torch.FloatTensor([px, py, vx, vy])
+
+        input_processed = torch.flatten(input_processed, end_dim=1).cuda()
+        intrinsic_parameters = torch.flatten(intrinsic_parameters, end_dim=1)
+        extrinsic_parameters = torch.flatten(extrinsic_parameters, end_dim=1)
+        return input_processed, intrinsic_parameters, extrinsic_parameters
+
+    def eval_process_feed(self, feed_dict):
+        input_data = feed_dict['img_data']
+
+        BA, BU, _, H, W = input_data.shape
+        assert BA == 1  # not implemented for more
+        assert BU == self.buffer_size
+
+        poses = get_circular_poses(input_data[0, -1, ...].cpu())
+        num_balls = len(poses)  # assume number of balls from first frame
+
+        input_processed = torch.zeros(1, num_balls, self.C_Final, H, W)
+        intrinsic_parameters = torch.zeros(1, num_balls, 6, dtype=torch.float)  # r, g, b, radius, mass, friction
+        extrinsic_parameters = torch.zeros(1, num_balls, 4, dtype=torch.float)
+        for j in range(1, BU)[::-1]:
+            img_orig = input_data[0, j].cpu()
+            for k in range(num_balls):
+                px, py, pr = poses[k].numpy()
+
+                if self.include_images:
+                    img_masked = tensor_img_px_circle_mask(img_orig, px, py, pr + DEFAULT_MASK_PX_OFFSET)
+                    input_processed[0, k, (j-1) * 3:j * 3, ...] = img_masked
+
+                if j != 0:
+                    opt_flow_forward = self.optical_flow(input_data[0, j - 1].cpu(), img_orig)
+                    opt_flow_back = self.optical_flow(img_orig, input_data[0, j - 1].cpu())
+
+                    rev_vx, rev_vy = opt_flow_back[:, int(py), int(px)].numpy()
+                    prev_px = px + rev_vx
+                    prev_py = py + rev_vy
+
+                    if self.include_optical_flow:
+                        opt_flow_masked = tensor_img_px_circle_mask(opt_flow_forward, prev_px, prev_py, pr)
+
+                        c_idx_start = self.include_images * BU * 3 + (j - 1) * 2
+                        c_idx_end = self.include_images * BU * 3 + j * 2
+                        input_processed[0, k, c_idx_start:c_idx_end, ...] = opt_flow_masked
+
+                    if j == BU - 1:
+                        extrinsic_parameters[0, k, :] = torch.FloatTensor([px, py, - rev_vx, - rev_vy])
+
+                        # intrinsic
+                        mean_rgb = get_tensor_img_px_circle_mask_rgb(img_orig, px, py, pr).mean(axis=0).numpy()
+                        intrinsic_parameters[0, k, :] = torch.FloatTensor(
+                            [mean_rgb[0], mean_rgb[1], mean_rgb[2], pr, -1, -1])
+
+                    poses[k, ...] = torch.FloatTensor([prev_px, prev_py, pr])
 
         input_processed = torch.flatten(input_processed, end_dim=1).cuda()
         intrinsic_parameters = torch.flatten(intrinsic_parameters, end_dim=1)
@@ -189,12 +241,12 @@ class ModelBuilder:
         return net_perceptual
 
     @staticmethod
-    def build_optical_flow(arch='spynet'):
+    def build_optical_flow(arch='farneback'):
         arch = arch.lower()
-        if arch == 'spynet':
-            optical_flow = spynet_optical_flow
-        elif arch == 'farneback':
+        if arch == 'farneback':
             optical_flow = farneback_optical_flow
+        elif arch == 'spynet':
+            optical_flow = spynet_optical_flow
         else:
             raise Exception('Architecture undefined!')
         return optical_flow

@@ -11,7 +11,7 @@ import argparse
 import torch
 import torch.nn as nn
 # Our libs
-from utils.metric import setup_logger, AverageMeter
+from utils.metric import setup_logger, MetricMeter
 from utils.gpu import parse_devices
 from utils.config import cfg
 from utils.dataset import TrainDataset
@@ -21,10 +21,10 @@ from utils.models.models import ModelBuilder, PerceptualModule
 
 # train one epoch
 def train(perceptual_module, iterator, optimizers, history, epoch, cfg):
-    batch_time = AverageMeter()
-    data_time = AverageMeter()
-    ave_total_loss = AverageMeter()
-    ave_acc = AverageMeter()
+    batch_time = MetricMeter()
+    data_time = MetricMeter()
+    ave_total_loss = MetricMeter()
+    ave_acc = MetricMeter()
 
     perceptual_module.train()
 
@@ -127,7 +127,7 @@ def adjust_learning_rate(optimizers, cur_iter, cfg):
 
 
 def main(cfg, gpus):
-    optical_flow = ModelBuilder.build_optical_flow()
+    optical_flow = ModelBuilder.build_optical_flow(cfg.MODEL.optical_flow)
     input_dim = cfg.MODEL.include_images * cfg.DATASET.buffer_size * 3 \
                 + cfg.MODEL.include_optical_flow * (cfg.DATASET.buffer_size - 1) * 2
     net_perceptual = ModelBuilder.build_perceptual(arch='resnet18', input_dim=input_dim, num_classes=cfg.DATASET.num_classes,
@@ -140,11 +140,7 @@ def main(cfg, gpus):
 
     # Dataset and Loader
     dataset_train_fps = [os.path.join(cfg.DATASET.list_train, fp) for fp in os.listdir(cfg.DATASET.list_train)]
-    dataset_train = TrainDataset(
-        dataset_train_fps,
-        batch_size_per_gpu=cfg.TRAIN.batch_size_per_gpu,
-        img_size=cfg.DATASET.img_size,
-        buffer_size=cfg.DATASET.buffer_size)
+    dataset_train = TrainDataset(dataset_train_fps, cfg)
 
     loader_train = torch.utils.data.DataLoader(
         dataset_train,

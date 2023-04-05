@@ -23,7 +23,7 @@ from data.data_gen import label2BallProps, MASS_VALUES, FRIC_VALUES
 
 def save_output(img, buffer, step, cfg):
     img = tensor_to_cv2(img)
-    output_fp = os.path.join(cfg.TEST.result, f'buffer_{buffer}_timestep_{step}.png')
+    output_fp = os.path.join(cfg.TEST.result, f'buffer_{buffer}_future_{step}.png')
     Image.fromarray(img).save(output_fp)
 
 
@@ -49,12 +49,12 @@ def test(perceptual_module, physics_engine, graphics_engine, loader, gpu, cfg):
             intrinsic_params[j, -1] = FRIC_VALUES[predicted_param_idxs[1]]
 
         physics_engine.start(intrinsic_params, extrinsic_params)
-        for step in range(max_steps):
-            #print(step, physics_engine.get_extrinsic_parameters())
+        for step in range(1, max_steps+1):
+            # print(step, physics_engine.get_extrinsic_parameters())
             physics_engine.step()
-            if (step+1) in cfg.TEST.prediction_timesteps:
+            if step in cfg.TEST.prediction_timesteps:
                 img = graphics_engine.get_img()
-                save_output(img, buffer_idx, step + 1, cfg)
+                save_output(img, buffer_idx, step, cfg)
         physics_engine.stop()
 
         pbar.update(1)
@@ -141,12 +141,10 @@ if __name__ == '__main__':
     # absolute paths of model weights
     cfg.MODEL.weights_perceptual = os.path.join(
         cfg.DIR, 'perceptual_' + cfg.TEST.checkpoint)
+    assert os.path.exists(cfg.MODEL.weights_perceptual), "checkpoint does not exist!"
 
     # generate testing image list
     cfg.TEST.list_test = args.imgs
-
-    assert os.path.exists(cfg.MODEL.weights_perceptual), "checkpoint does not exist!"
-
     if not os.path.isdir(cfg.TEST.result):
         os.makedirs(cfg.TEST.result)
 

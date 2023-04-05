@@ -5,6 +5,8 @@ DATASET:
   img_size: (256, 256)
   buffer_size: 3
   num_classes: 9
+  fps: 30
+  urdf_folder: './data'
 
 MODEL:
   optical_flow: "farneback"
@@ -27,16 +29,14 @@ TRAIN:
   seed: 304
 
 VAL:
-  visualize: False
   checkpoint: "epoch_5.pth"
+  prediction_timesteps: [1,5,10,20,30,40,50,57]
 
 TEST:
   checkpoint: "epoch_5.pth"
   result: "./results"
   physics_engine: "pybullet"
   graphics_engine: "pybullet"
-  fps: 30
-  urdf_folder: './data'
   prediction_timesteps: [1,5,10,20]
 
 DIR: "ckpt/same_vis_same_phys-farneback-resnet18-pybullet"

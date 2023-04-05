@@ -5,11 +5,14 @@
 import os
 import json
 import re
-
+# numerical libs
 import torch
 from PIL import Image
 import pandas as pd
 import numpy as np
+
+from utils.mask import scale2scale
+
 
 TEST_BUFFER_PREFIX = 'buffer'
 TEST_TIMESTEP_PREFIX = 'timestep'
@@ -73,7 +76,6 @@ class BaseDataset(torch.utils.data.Dataset):
 
             # parse the image files
             self.parse_input_list(data_fp, img_prefix, **kwargs)
-        print(f'# buffer samples: {sum(self.num_samples) - self.buffer_size}')
 
         self.all_same_size = all(self.num_samples[0] == x for x in self.num_samples)
         self.idxs = list(range(sum(self.num_samples)))
@@ -120,11 +122,12 @@ class BaseDataset(torch.utils.data.Dataset):
 
 
 class TrainDataset(BaseDataset):
-    def __init__(self, data_fp, batch_size_per_gpu, img_size, buffer_size, **kwargs):
-        super(TrainDataset, self).__init__(data_fp, img_size, buffer_size, **kwargs)
-        self.batch_size_per_gpu = batch_size_per_gpu
+    def __init__(self, data_fp, cfg, **kwargs):
+        super(TrainDataset, self).__init__(data_fp, cfg.DATASET.img_size, cfg.DATASET.buffer_size, **kwargs)
+        self.batch_size_per_gpu = cfg.TRAIN.batch_size_per_gpu
         self.cur_idx = 0
         self.if_shuffled = False
+        print(f'# buffer samples: {sum(self.num_samples) - self.buffer_size}')
 
     def __getitem__(self, index):
         # NOTE: random shuffle for the first time. shuffle in __init__ is useless
@@ -180,6 +183,87 @@ class TrainDataset(BaseDataset):
         # return sum(self.num_samples)
 
 
+class ValDataset(BaseDataset):
+    def __init__(self, data_fp, cfg, **kwargs):
+        super(ValDataset, self).__init__(data_fp, cfg.DATASET.img_size, cfg.DATASET.buffer_size, **kwargs)
+        self.cur_idx = -1
+        self.cfg = cfg
+        print(f'# samples: {len(self)}')
+
+    def __getitem__(self, index):
+        batch_images = torch.zeros(1, self.buffer_size, 3, self.img_size[0], self.img_size[1])
+        batch_labels = -1 * torch.ones(1, max(self.num_balls))
+        batch_prop_states = -1 * torch.ones(1, max(self.num_balls), 3) # x,y,radius
+        batch_ext_states = -1 * torch.ones(1, len(self.cfg.VAL.prediction_timesteps), max(self.num_balls),
+                                           4)  # x, y, x_lin_vel, y_lin_vel
+
+        self.cur_idx += 1
+        if self.cur_idx >= (sum(self.num_samples)):
+            self.cur_idx = 0
+        didx, tidx = self.idx2idxs(self.idxs[self.cur_idx])
+        orig_idx = self.cur_idx
+
+        while self.num_samples[didx] - 1 - tidx < max(self.cfg.VAL.prediction_timesteps):
+            self.cur_idx += self.num_samples[didx] - tidx
+
+            if self.cur_idx >= (sum(self.num_samples)):
+                raise RuntimeError('Dataset too small to evaluate future timesteps')
+
+            didx, tidx = self.idx2idxs(self.idxs[self.cur_idx])
+
+        batch_records = self.list_buffer_samples[didx][tidx]
+
+        with open(self.data_info_fps[didx]) as f:
+            data_info = json.load(f)
+        ball_csvs = [pd.read_csv(fp, index_col=0) for fp in self.ball_csv_fpss[didx]]
+
+        # input data
+        for i in range(self.buffer_size):
+            record_img_fn = batch_records[i]
+
+            # load image and label
+            image_path = os.path.join(self.data_fps[didx], record_img_fn)
+            img = Image.open(image_path).convert('RGB')
+            if not ((img.width == self.img_size[0]) and (img.height == self.img_size[1])):
+                img = img_resize(img, (self.img_size[0], self.img_size[1]), interp='bilinear')
+            # image transform, to torch float tensor 3xHxW
+            img = img_transform(img)
+
+            # put into batch arrays
+            batch_images[0, i][:, :img.shape[1], :img.shape[2]] = img
+
+        curr_step = extract_integer(batch_records[-1])
+        for j in range(self.num_balls[didx]):
+            # label info
+            record_label = [data_info[str(j)]['label']]
+            batch_labels[0, j] = torch.FloatTensor(record_label)
+
+            # object proposal info
+            record_prop_state = list(ball_csvs[j].iloc[curr_step][['pose_x', 'pose_y']]) + [data_info[str(j)]['radius']]
+            batch_prop_states[0, j, 0] = scale2scale(record_prop_state[0], -1.0, 1.0, 0.0, 256.0)
+            batch_prop_states[0, j, 1] = scale2scale(record_prop_state[1], -1.0, 1.0, 256.0, 0.0)
+            batch_prop_states[0, j, 2] = scale2scale(record_prop_state[2], 0.0, 1.0, 0.0, 256.0 // 2)
+
+            # future steps info
+            for i, future_step in enumerate(self.cfg.VAL.prediction_timesteps):
+                record_state = ball_csvs[j].iloc[curr_step + future_step][['pose_x', 'pose_y', 'vel_lin_x', 'vel_lin_y']]
+
+                batch_ext_states[0, i, j, 0] = scale2scale(record_state[0], -1.0, 1.0, 0.0, 256.0)
+                batch_ext_states[0, i, j, 1] = scale2scale(record_state[1], -1.0, 1.0, 256.0, 0.0)
+                batch_ext_states[0, i, j, 2] = record_state[2] * 256.0 / (self.cfg.DATASET.fps * 2)
+                batch_ext_states[0, i, j, 3] = - record_state[3] * 256.0 / (self.cfg.DATASET.fps * 2)
+
+        output = dict()
+        output['img_data'] = batch_images
+        output['state_label'] = batch_labels
+        output['state_prop'] = batch_prop_states
+        output['future_states'] = batch_ext_states
+        return output
+
+    def __len__(self):
+        return sum([max(0, num_sample - max(self.cfg.VAL.prediction_timesteps)) for num_sample in self.num_samples])
+
+
 class TestDataset(torch.utils.data.Dataset):
     def __init__(self, cfg, **kwargs):
         super(TestDataset, self).__init__(**kwargs)
@@ -212,7 +296,8 @@ class TestDataset(torch.utils.data.Dataset):
         num_sample = len(list_sample) // self.buffer_size
         assert num_sample > 0
         self.num_samples = num_sample
-        self.list_buffer_samples = [list_sample[i * self.buffer_size:(i+1) * self.buffer_size] for i in range(num_sample)]
+        self.list_buffer_samples = [list_sample[i * self.buffer_size:(i + 1) * self.buffer_size] for i in
+                                    range(num_sample)]
         assert self.check_buffer_list(self.list_buffer_samples)
 
     def check_buffer_list(self, input_list):
