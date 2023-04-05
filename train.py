@@ -187,7 +187,7 @@ if __name__ == '__main__':
     )
     parser.add_argument(
         "--cfg",
-        default="config/same_vis_same_phys-spynet-resnet18-pybullet.yaml",
+        default="config/predict_friction_mass_independent-farneback-resnet18-pybullet.yaml",
         metavar="FILE",
         help="path to config file",
         type=str,

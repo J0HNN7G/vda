@@ -50,13 +50,11 @@ WORLD_Y_MIN = -0.5
 WORLD_Y_MAX = 0.5
 
 # ball radius values in metres
-RAD_VALUES = np.array([0.03, 0.06, 0.09])
+RAD_VALUES = np.array([0.04, 0.07, 0.1])
 # ball mass values in kilograms
 MASS_VALUES = np.array([0.2, 0.4, 0.6])
-
 # rolling friction coefficient values
-#FRIC_VALUES = np.array([10 ** (-4), 5 * 10 ** (-4), 10 ** (-3)])
-FRIC_VALUES = np.array([10 ** (-4), 10 ** (-3)])
+FRIC_VALUES = np.array([10 ** (-4), 10 ** (-2)])
 # linear velocity range in ms⁻1
 MAX_ABS_VEL = 2.5
 # variety of colours for balls
