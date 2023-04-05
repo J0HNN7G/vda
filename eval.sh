@@ -16,12 +16,12 @@ python3 eval.py --cfg config/predict_friction-spynet-resnet18-pybullet.yaml
 
 # experiment 2
 python3 eval.py --cfg config/predict_mass-farneback-resnet18-pybullet.yaml
-#python3 ../eval.py --cfg config/predict_mass-spynet-resnet18-pybullet.yaml
+python3 ../eval.py --cfg config/predict_mass-spynet-resnet18-pybullet.yaml
 
 # experiment 3
 python3 eval.py --cfg config/predict_friction_mass_dependent-farneback-resnet18-pybullet.yaml
-#python3 eval.py --cfg config/predict_friction_mass_dependent-spynet-resnet18-pybullet.yaml
+python3 eval.py --cfg config/predict_friction_mass_dependent-spynet-resnet18-pybullet.yaml
 
 # experiment 4
 python3 eval.py --cfg config/predict_friction_mass_independent-farneback-resnet18-pybullet.yaml
-#python3 eval.py --cfg config/predict_friction_mass_independent-spynet-resnet18-pybullet.yaml
+python3 eval.py --cfg config/predict_friction_mass_independent-spynet-resnet18-pybullet.yaml

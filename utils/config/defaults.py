@@ -69,6 +69,10 @@ _C.TRAIN.disp_iter = 20
 # manual seed
 _C.TRAIN.seed = 304
 
+# early stopping if no improvements in this many iterations
+_C.TRAIN.no_improv_limit = 10
+
+
 # -----------------------------------------------------------------------------
 # Validation
 # -----------------------------------------------------------------------------

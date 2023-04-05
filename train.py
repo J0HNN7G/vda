@@ -69,6 +69,13 @@ def train(perceptual_module, iterator, optimizers, history, epoch, cfg):
             history['train']['loss'].append(loss.data.item())
             history['train']['acc'].append(acc.data.item())
 
+            # early stopping
+            if len(history['train']['acc']) > cfg.TRAIN.no_improv_limit:
+                first_val = history['train']['acc'][-cfg.TRAIN.no_improv_limit]
+                max_val = max(history['train']['acc'][-cfg.TRAIN.no_improv_limit:])
+                if first_val == max_val:
+                    break
+
 
 def checkpoint(nets, history, cfg, epoch):
     print('Saving checkpoints...')
@@ -130,7 +137,8 @@ def main(cfg, gpus):
     optical_flow = ModelBuilder.build_optical_flow(cfg.MODEL.optical_flow)
     input_dim = cfg.MODEL.include_images * cfg.DATASET.buffer_size * 3 \
                 + cfg.MODEL.include_optical_flow * (cfg.DATASET.buffer_size - 1) * 2
-    net_perceptual = ModelBuilder.build_perceptual(arch='resnet18', input_dim=input_dim, num_classes=cfg.DATASET.num_classes,
+    net_perceptual = ModelBuilder.build_perceptual(arch='resnet18', input_dim=input_dim,
+                                                   num_classes=cfg.DATASET.num_classes,
                                                    weights=cfg.MODEL.weights_perceptual)
     crit = torch.nn.CrossEntropyLoss(ignore_index=-1)
     perceptual_module = PerceptualModule(optical_flow, net_perceptual, crit,
@@ -177,6 +185,14 @@ def main(cfg, gpus):
 
         # checkpointing
         checkpoint(nets, history, cfg, epoch + 1)
+
+        # early stopping
+        if len(history['train']['acc']) > cfg.TRAIN.no_improv_limit:
+            first_val = history['train']['acc'][-cfg.TRAIN.no_improv_limit]
+            max_val = max(history['train']['acc'][-cfg.TRAIN.no_improv_limit:])
+            if first_val == max_val:
+                f'Early Stopping! No improvements in last {cfg.TRAIN.no_improv_limit} iterations'
+                break
 
     print('Training Done!')
 
