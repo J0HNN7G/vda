@@ -1,6 +1,6 @@
-# Visual De-Animation in PyTorch for Pool Balls
+# Visual De-Animation in PyTorch
 
-This is an unofficial PyTorch implementation of visual de-animation.
+This is an unofficial PyTorch implementation of visual de-animation, applied to pool ball simulations.
 
 ## Supported models
 We split our models into optical flow, perceptual module, physics module and graphics module. We have provided some pre-configured models in the ```config``` folder.
