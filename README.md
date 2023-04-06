@@ -119,7 +119,7 @@ chmod +x train.sh
 
 To test a model on a folder of various image sequences (```$PATH_IMG```), you can simply do the following:
 ```bash
-python3 -u test.py --imgs $PATH_IMG --gpu $GPU --cfg $CFG
+python3 -u test.py --imgs $PATH_IMG --gpu $GPU --cfg $CFG --TEST.prediction_timesteps $PREDICTION_TIMESTEPS
 ```
 This will only work if the folder of image sequences is formatted as follows:
 ```
@@ -135,21 +135,28 @@ $PATH_IMG
 │   buffer_2_timestep_2.png
 │   ...
 ```
-Remember to make sure buffer size is equal to what the model was trained for.
+
+The example below is to predict 1, 5, 10 timesteps into the future for each given buffer using Farneback + ResNet18 + PyBullet for ```predict_friction``` data
+```bash
+python3 eval.py --gpus GPUS --cfg config/predict_friction-farneback-resnet18-pybullet.yaml --TEST.prediction_timesteps [1,5,10]
+```
+
+Remember to make sure buffer size is equal to what the model was trained for. By default ```$PATH_IMG = examples```
+and will output predictions to folder ```results```.
 
 ## Evaluation
 1. Evaluate a trained model on the validation set. Evaluations are by default saved in folder ```ckpt```.
 
 For example:
 
-* Evaluate Farneback + ResNet18 + PyBullet for ```predict_friction``` data
+* Evaluate Farneback + ResNet18 + PyBullet for data ```predict_friction``` with future time steps 1, 5, 10
 ```bash
-python3 eval.py --gpus GPUS --cfg config/predict_friction-farneback-resnet18-pybullet.yaml
+python3 eval.py --gpus GPUS --cfg config/predict_friction-farneback-resnet18-pybullet.yaml --VAL.prediction_timesteps [1,5,10]
 ```
 
-* Evaluate SpyNet + ResNet18 + PyBullet for ```predict_friction_mass_independent``` data
+* Evaluate SpyNet + ResNet18 + PyBullet for data ```predict_friction_mass_independent``` with future time steps 1, 5, 10
 ```bash
-python3 eval.py --gpus GPUS --cfg config/predict_friction_mass_independent-spynet-resnet18-pybullet.yaml
+python3 eval.py --gpus GPUS --cfg config/predict_friction_mass_independent-spynet-resnet18-pybullet.yaml --VAL.prediction_timesteps [1,5,10]
 ```
 
 A script is provided to run all configurations used in our experiments

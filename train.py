@@ -70,11 +70,11 @@ def train(perceptual_module, iterator, optimizers, history, epoch, cfg):
             history['train']['acc'].append(acc.data.item())
 
             # early stopping
-            if len(history['train']['acc']) > cfg.TRAIN.no_improv_limit:
-                first_val = history['train']['acc'][-cfg.TRAIN.no_improv_limit]
-                max_val = max(history['train']['acc'][-cfg.TRAIN.no_improv_limit:])
-                if first_val == max_val:
-                    break
+            #if len(history['train']['acc']) > cfg.TRAIN.no_improv_limit:
+            #   first_val = history['train']['acc'][-cfg.TRAIN.no_improv_limit]
+            #    max_val = max(history['train']['acc'][-cfg.TRAIN.no_improv_limit:])
+            #    if first_val == max_val:
+            #        break
 
 
 def checkpoint(nets, history, cfg, epoch):
@@ -187,12 +187,12 @@ def main(cfg, gpus):
         checkpoint(nets, history, cfg, epoch + 1)
 
         # early stopping
-        if len(history['train']['acc']) > cfg.TRAIN.no_improv_limit:
-            first_val = history['train']['acc'][-cfg.TRAIN.no_improv_limit]
-            max_val = max(history['train']['acc'][-cfg.TRAIN.no_improv_limit:])
-            if first_val == max_val:
-                f'Early Stopping! No improvements in last {cfg.TRAIN.no_improv_limit} iterations'
-                break
+        #if len(history['train']['acc']) > cfg.TRAIN.no_improv_limit:
+        #    first_val = history['train']['acc'][-cfg.TRAIN.no_improv_limit]
+        #    max_val = max(history['train']['acc'][-cfg.TRAIN.no_improv_limit:])
+        #    if first_val == max_val:
+        #        f'Early Stopping! No improvements in last {cfg.TRAIN.no_improv_limit} iterations'
+        #        break
 
     print('Training Done!')
 
