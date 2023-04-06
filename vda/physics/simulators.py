@@ -9,7 +9,7 @@ import math
 import pybullet as pb
 import torch
 from data.data_gen import SURFACE_SPHERE_OFFSET, DEFAULT_RESTITUTION, PB_FPS
-from utils.mask import scale2scale
+from vda.mask import scale2scale
 
 
 class PhysicsEngineBuilder:

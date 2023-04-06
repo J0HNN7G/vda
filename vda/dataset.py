@@ -11,7 +11,7 @@ from PIL import Image
 import pandas as pd
 import numpy as np
 
-from utils.mask import scale2scale
+from vda.mask import scale2scale
 
 
 TEST_BUFFER_PREFIX = 'buffer'

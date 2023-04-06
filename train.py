@@ -11,12 +11,12 @@ import argparse
 import torch
 import torch.nn as nn
 # Our libs
-from utils.metric import setup_logger, MetricMeter
-from utils.gpu import parse_devices
-from utils.config import cfg
-from utils.dataset import TrainDataset
-from utils.models.lib import UserScatteredDataParallel, user_scattered_collate, patch_replication_callback
-from utils.models.models import ModelBuilder, PerceptualModule
+from vda.metric import setup_logger, MetricMeter
+from vda.gpu import parse_devices
+from vda.config import cfg
+from vda.dataset import TrainDataset
+from vda.models.lib import UserScatteredDataParallel, user_scattered_collate, patch_replication_callback
+from vda.models.models import ModelBuilder, PerceptualModule
 
 
 # train one epoch

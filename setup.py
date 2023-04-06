@@ -24,7 +24,9 @@ setuptools.setup(
         'torch',
         'torchvision',
         'Pillow',
+        'opencv-python'
         'pandas',
+        'matplotlib',
         'tqdm',
         'yacs'
     ]

@@ -3,7 +3,7 @@ import cv2
 import torch
 import numpy as np
 
-from utils.pose import tensor_to_cv2
+from vda.pose import tensor_to_cv2
 
 
 def farneback_optical_flow(img1, img2):

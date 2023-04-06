@@ -7,7 +7,7 @@ import torch.nn as nn
 import math
 
 from .utils import load_url
-from utils.models.lib import SynchronizedBatchNorm2d
+from vda.models.lib import SynchronizedBatchNorm2d
 
 BatchNorm2d = SynchronizedBatchNorm2d
 

@@ -1,6 +1,6 @@
 # Visual De-Animation in PyTorch for Pool Balls
 
-This is a PyTorch implementation of visual de-animation.
+This is an unofficial PyTorch implementation of visual de-animation.
 
 ## Supported models
 We split our models into optical flow, perceptual module, physics module and graphics module. We have provided some pre-configured models in the ```config``` folder.
@@ -35,21 +35,41 @@ Graphics Module:
         <td>ResNet18</td>
         <td>PyBullet</td>
         <td>PyBullet</td>
-        <td>0.0008</td>
-        <td>9.0000</td>
-        <td>0.5000</td>
-        <td>3.3000</td>
+        <td>TODO</td>
+        <td>TODO</td>
+        <td>TODO</td>
+        <td>TODO</td>
     </tr>
     <tr>
         <td>SpyNet</td>
         <td>ResNet18</td>
         <td>PyBullet</td>
         <td>PyBullet</td>
-        <td>0.0008</td>
-        <td>9.0000</td>
-        <td>0.5000</td>
-        <td>3.3000</td>
-    </tr>   
+        <td>TODO</td>
+        <td>TODO</td>
+        <td>TODO</td>
+        <td>TODO</td>
+    </tr> 
+    <tr>
+        <td>Farneback</td>
+        <td>LeNet</td>
+        <td>PyBullet</td>
+        <td>PyBullet</td>
+        <td>TODO</td>
+        <td>TODO</td>
+        <td>TODO</td>
+        <td>TODO</td>
+    </tr> 
+    <tr>
+        <td>SpyNet</td>
+        <td>LeNet</td>
+        <td>PyBullet</td>
+        <td>PyBullet</td>
+        <td>TODO</td>
+        <td>TODO</td>
+        <td>TODO</td>
+        <td>TODO</td>
+    </tr> 
 
 
 </tbody></table>
@@ -60,26 +80,14 @@ The training is benchmarked with a single Nvidia GTX 1060  (6GB GPU Memory), the
 The code is developed under the following configurations.
 - Hardware: >=1 GPUs for training, >=1 GPU for testing (set ```[--gpus GPUS]``` accordingly)
 - Software: Ubuntu 20.04.6 LTS, ***CUDA=11, Python=3.8.10, PyTorch=1.13.1***
-- Dependencies: numpy, opencv, matplotlib, yacs, tqdm
-
-## Quick start: Test on an image using our trained model 
-1. Here is a simple demo to do inference on a single image:
-```bash
-chmod +x demo_test.sh
-./demo_test.sh
-```
-This script downloads a trained model (ResNet50dilated + PPM_deepsup) and a test image, runs the test script, and saves predicted segmentation (.png) to the working directory.
-
-2. To test on an image or a folder of images (```$PATH_IMG```), you can simply do the following:
-```
-python3 -u test.py --imgs $PATH_IMG --gpu $GPU --cfg $CFG
-```
+- Dependencies: numpy, pybullet, torch, torchvision, Pillow, opencv-python, pandas, matplotlib, tqdm, yacs
 
 ## Training
-1. Download the ADE20K scene parsing dataset:
+1. Generate the pool ball data. 
 ```bash
-chmod +x download_ADE20K.sh
-./download_ADE20K.sh
+cd data/
+chmod +x data_gen.sh
+./data_gen.sh
 ```
 2. Train a model by selecting the GPUs (```$GPUS```) and configuration file (```$CFG```) to use. During training, checkpoints by default are saved in folder ```ckpt```.
 ```bash
@@ -89,76 +97,90 @@ python3 train.py --gpus $GPUS --cfg $CFG
 
 For example, you can start with our provided configurations: 
 
-* Train MobileNetV2dilated + C1_deepsup
+* Train Farneback + ResNet18 + PyBullet for ```predict_friction``` data
 ```bash
-python3 train.py --gpus GPUS --cfg config/ade20k-mobilenetv2dilated-c1_deepsup.yaml
+python3 train.py --gpus GPUS --cfg config/predict_friction-farneback-resnet18-pybullet.yaml
 ```
 
-* Train ResNet50dilated + PPM_deepsup
+* Train SpyNet + ResNet18 + PyBullet for ```predict_friction_mass_independent``` data
 ```bash
-python3 train.py --gpus GPUS --cfg config/ade20k-resnet50dilated-ppm_deepsup.yaml
+python3 train.py --gpus GPUS --cfg config/predict_friction_mass_independent-spynet-resnet18-pybullet.yaml
 ```
 
-* Train UPerNet101
+A script is provided to run all configurations used in our experiments
 ```bash
-python3 train.py --gpus GPUS --cfg config/ade20k-resnet101-upernet.yaml
+chmod +x train.sh
+./train.sh
 ```
 
 3. You can also override options in commandline, for example  ```python3 train.py TRAIN.num_epoch 10 ```.
 
+## Testing
+
+To test a model on a folder of various image sequences (```$PATH_IMG```), you can simply do the following:
+```bash
+python3 -u test.py --imgs $PATH_IMG --gpu $GPU --cfg $CFG
+```
+This will only work if the folder of image sequences is formatted as follows:
+```
+$PATH_IMG
+│   buffer_0_timestep_0.png
+│   buffer_0_timestep_1.png
+│   buffer_0_timestep_2.png
+│   buffer_1_timestep_0.png
+│   buffer_1_timestep_1.png
+│   buffer_1_timestep_2.png
+│   buffer_2_timestep_0.png
+│   buffer_2_timestep_1.png
+│   buffer_2_timestep_2.png
+│   ...
+```
+Remember to make sure buffer size is equal to what the model was trained for.
 
 ## Evaluation
-1. Evaluate a trained model on the validation set. Add ```VAL.visualize True``` in argument to output visualizations as shown in teaser.
+1. Evaluate a trained model on the validation set. Evaluations are by default saved in folder ```ckpt```.
 
 For example:
 
-* Evaluate MobileNetV2dilated + C1_deepsup
+* Evaluate Farneback + ResNet18 + PyBullet for ```predict_friction``` data
 ```bash
-python3 eval_multipro.py --gpus GPUS --cfg config/ade20k-mobilenetv2dilated-c1_deepsup.yaml
+python3 eval.py --gpus GPUS --cfg config/predict_friction-farneback-resnet18-pybullet.yaml
 ```
 
-* Evaluate ResNet50dilated + PPM_deepsup
+* Evaluate SpyNet + ResNet18 + PyBullet for ```predict_friction_mass_independent``` data
 ```bash
-python3 eval_multipro.py --gpus GPUS --cfg config/ade20k-resnet50dilated-ppm_deepsup.yaml
+python3 eval.py --gpus GPUS --cfg config/predict_friction_mass_independent-spynet-resnet18-pybullet.yaml
 ```
 
-* Evaluate UPerNet101
+A script is provided to run all configurations used in our experiments
 ```bash
-python3 eval_multipro.py --gpus GPUS --cfg config/ade20k-resnet101-upernet.yaml
+chmod +x eval.sh
+./eval.sh
 ```
 
 ## Integration with other projects
 This library can be installed via `pip` to easily integrate with another codebase
 ```bash
-pip install git+https://github.com/CSAILVision/semantic-segmentation-pytorch.git@master
+pip install git+https://github.com/J0HNN7G/intuitive_physics.git
 ```
 
 Now this library can easily be consumed programmatically. For example
 ```python
-from mit_semseg.config import cfg
-from mit_semseg.dataset import TestDataset
-from mit_semseg.models import ModelBuilder, SegmentationModule
+from vda.config import cfg
+from vda.dataset import TestDataset
+from vda.models import ModelBuilder, PerceptualModule
 ```
 
 ## Reference
 
-If you find the code or pre-trained models useful, please cite the following papers:
+If you find the code or data generation useful, please link to this GitHub repository and cite the following papers:
 
-Semantic Understanding of Scenes through ADE20K Dataset. B. Zhou, H. Zhao, X. Puig, T. Xiao, S. Fidler, A. Barriuso and A. Torralba. International Journal on Computer Vision (IJCV), 2018. (https://arxiv.org/pdf/1608.05442.pdf)
+Learning to See Physics via Visual De-animation. J. Wu, E. Lu, P. Kohli, W. Freeman and J. Tenenbaum. Neural Information Processing Systems
+(NeurIPS), 2017.
 
-    @article{zhou2018semantic,
-      title={Semantic understanding of scenes through the ade20k dataset},
-      author={Zhou, Bolei and Zhao, Hang and Puig, Xavier and Xiao, Tete and Fidler, Sanja and Barriuso, Adela and Torralba, Antonio},
-      journal={International Journal on Computer Vision},
-      year={2018}
+    @inproceedings{wu2017vda,
+         title = {Learning to See Physics via Visual De-animation},
+         author = {Wu, Jiajun and Lu, Erika and Kohli, Pushmeet and Freeman, Bill and Tenenbaum, Joshua},
+         booktitle = {Advances in Neural Information Processing Systems},
+         year = {2017}
     }
-
-Scene Parsing through ADE20K Dataset. B. Zhou, H. Zhao, X. Puig, S. Fidler, A. Barriuso and A. Torralba. Computer Vision and Pattern Recognition (CVPR), 2017. (http://people.csail.mit.edu/bzhou/publication/scene-parse-camera-ready.pdf)
-
-    @inproceedings{zhou2017scene,
-        title={Scene Parsing through ADE20K Dataset},
-        author={Zhou, Bolei and Zhao, Hang and Puig, Xavier and Fidler, Sanja and Barriuso, Adela and Torralba, Antonio},
-        booktitle={Proceedings of the IEEE Conference on Computer Vision and Pattern Recognition},
-        year={2017}
-    }
-    

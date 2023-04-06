@@ -7,12 +7,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from . import resnet
-from utils.optical_flow import spynet_optical_flow, farneback_optical_flow
-from utils.pose import get_circular_poses
-from utils.mask import tensor_arr_dist_circle_mask, tensor_img_dist_circle_mask, tensor_img_px_circle_mask, \
+from vda.optical_flow import spynet_optical_flow, farneback_optical_flow
+from vda.pose import get_circular_poses
+from vda.mask import tensor_arr_dist_circle_mask, tensor_img_dist_circle_mask, tensor_img_px_circle_mask, \
     get_tensor_img_px_circle_mask_rgb
 
-from utils.visualization import show_farneback_optical_flows
+from vda.visualization import show_farneback_optical_flows
 
 # default input dimensions
 DEFAULT_RGB_DIM = 3

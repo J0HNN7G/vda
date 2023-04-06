@@ -9,16 +9,15 @@ import argparse
 from tqdm import tqdm
 # Numerical libs
 import torch
-import torch.nn.functional as F
 # Our libs
-from utils.metric import setup_logger, MetricMeter, label_accuracy, pixel_mse, manhattan_distance, \
+from vda.metric import setup_logger, MetricMeter, label_accuracy, pixel_mse, manhattan_distance, \
     calculate_object_proposal_metrics
-from utils.config import cfg
-from utils.dataset import ValDataset
-from utils.models.lib import user_scattered_collate, async_copy_to
-from utils.models.models import ModelBuilder, PerceptualModule
-from utils.physics.simulators import PhysicsEngineBuilder
-from utils.graphics.renderers import GraphicsEngineBuilder
+from vda.config import cfg
+from vda.dataset import ValDataset
+from vda.models.lib import user_scattered_collate, async_copy_to
+from vda.models.models import ModelBuilder, PerceptualModule
+from vda.physics.simulators import PhysicsEngineBuilder
+from vda.graphics.renderers import GraphicsEngineBuilder
 from data.data_gen import label2BallProps, MASS_VALUES, FRIC_VALUES
 
 

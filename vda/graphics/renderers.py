@@ -7,7 +7,7 @@ from abc import ABC, abstractmethod
 import pybullet as pb
 from PIL import Image
 from data.data_gen import CAM_VIEW_MATRIX, CAM_PROJECTION_MATRIX, DEFAULT_LIGHT_DIRECTION
-from utils.dataset import img_transform
+from vda.dataset import img_transform
 
 
 class GraphicsEngineBuilder:

@@ -10,14 +10,14 @@ import torch
 from tqdm import tqdm
 from PIL import Image
 # Our libs
-from utils.metric import setup_logger
-from utils.config import cfg
-from utils.dataset import TestDataset
-from utils.pose import tensor_to_cv2
-from utils.models.lib import user_scattered_collate, async_copy_to
-from utils.models.models import ModelBuilder, PerceptualModule
-from utils.physics.simulators import PhysicsEngineBuilder
-from utils.graphics.renderers import GraphicsEngineBuilder
+from vda.metric import setup_logger
+from vda.config import cfg
+from vda.dataset import TestDataset
+from vda.pose import tensor_to_cv2
+from vda.models.lib import user_scattered_collate, async_copy_to
+from vda.models.models import ModelBuilder, PerceptualModule
+from vda.physics.simulators import PhysicsEngineBuilder
+from vda.graphics.renderers import GraphicsEngineBuilder
 from data.data_gen import label2BallProps, MASS_VALUES, FRIC_VALUES
 
 
