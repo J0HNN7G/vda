@@ -180,14 +180,21 @@ from vda.models import ModelBuilder, PerceptualModule
 
 ## Reference
 
-If you find the code or data generation useful, please link to this GitHub repository and cite the following papers:
+If you find the code and data generation useful, please cite the following paper and this GitHub Repository:
 
 Learning to See Physics via Visual De-animation. J. Wu, E. Lu, P. Kohli, W. Freeman and J. Tenenbaum. Neural Information Processing Systems
 (NeurIPS), 2017.
 
-    @inproceedings{wu2017vda,
-         title = {Learning to See Physics via Visual De-animation},
-         author = {Wu, Jiajun and Lu, Erika and Kohli, Pushmeet and Freeman, Bill and Tenenbaum, Joshua},
-         booktitle = {Advances in Neural Information Processing Systems},
-         year = {2017}
-    }
+    [1] @inproceedings{wu2017vda,
+             title = {Learning to See Physics via Visual De-animation},
+             author = {Wu, Jiajun and Lu, Erika and Kohli, Pushmeet and Freeman, Bill and Tenenbaum, Joshua},
+             booktitle = {Advances in Neural Information Processing Systems},
+             year = {2017}
+        }
+
+    [2] @misc{frennert2023vda,
+             author = {Jonathan Gustafsson Frennert},
+             title = {A Reimplementation of Visual De-Animation Using PyTorch},
+             year = {2023},
+             howpublished = {\url{https://github.com/J0HNN7G/intuitive_physics}}
+        }
