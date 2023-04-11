@@ -2,6 +2,8 @@
 
 This is an unofficial PyTorch implementation of visual de-animation, applied to pool ball simulations.
 
+All pre-trained models can found at: https://drive.google.com/file/d/1hWRBVxRsVRbzPNV2--Xs0zmU9pRHwBjW/view?usp=share_link 
+
 ## Supported models
 We split our models into optical flow, perceptual module, physics module and graphics module. We have provided some pre-configured models in the ```config``` folder.
 
@@ -69,9 +71,7 @@ Graphics Module:
         <td>TODO</td>
         <td>TODO</td>
         <td>TODO</td>
-    </tr> 
-
-
+    </tr>
 </tbody></table>
 
 The training is benchmarked with a single Nvidia GTX 1060  (6GB GPU Memory), the inference speed is benchmarked without visualization.
