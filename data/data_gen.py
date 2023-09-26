@@ -234,7 +234,8 @@ def initialize_balls(num_balls, same_phys, same_vis, mode):
         labeler = lambda x: x[0]
     elif mode == 'predict_friction_mass_dependent':
         ball_mass_idx = ball_radi_idx = np.random.randint(min(len(MASS_VALUES), len(RAD_VALUES)), size=num_balls, dtype=int)
-        ball_fric_idx = ball_color_idx = np.random.randint(min(len(FRIC_VALUES), len(BALL_COLOR_OPT)), size=num_balls, dtype=int)
+        ball_fric_idx = np.random.randint(len(FRIC_VALUES), size=num_balls, dtype=int)
+        ball_color_idx = (ball_mass_idx-1) * min(len(MASS_VALUES), len(RAD_VALUES)) + (ball_fric_idx - 1)
         labeler = ballProps2Label
     elif mode == 'predict_friction_mass_independent':
         ball_mass_idx = ball_radi_idx = np.random.randint(min(len(MASS_VALUES), len(RAD_VALUES)), size=num_balls, dtype=int)
@@ -248,7 +249,7 @@ def initialize_balls(num_balls, same_phys, same_vis, mode):
     ballFriction = FRIC_VALUES[ball_fric_idx]
     ballRadi = RAD_VALUES[ball_radi_idx]
     ballColor = BALL_COLOR_OPT[ball_color_idx]
-    ballInitLinVel = [scale2scale(np.append(np.random.rand(2), 0)) for _ in
+    ballInitLinVel = [3 * scale2scale(np.append(np.random.rand(2), 0), oldMin=0.0) for _ in
                       range(num_balls)]
     ballInitAngVel = [[0, 0, 0]] * num_balls
 
@@ -262,8 +263,8 @@ def initialize_balls(num_balls, same_phys, same_vis, mode):
         while not allSafePos:
             # new position guaranteed not to overlap with walls
             initPos = np.array(
-                [scale2scale(np.random.rand()),
-                 scale2scale(np.random.rand()),
+                [scale2scale(np.random.rand(), oldMin=0.0),
+                 scale2scale(np.random.rand(), oldMin=0.0),
                  ballRadi[i] + SURFACE_SPHERE_OFFSET])
             # check if overlaps with other balls
             isSafePos = True
