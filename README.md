@@ -14,16 +14,14 @@ Object Represenation Module:
 - Encoder-Decoder Bottleneck (TODO)
 
 Perceptual Module:
+- Resnet
 - AlexNet (TODO)
 - GoogleLeNet (TODO)
-- Resnet (Extend)
 - VisionTransformer (TODO)
 
 Simulation Module:
-- PyBullet (Extend)
+- PyBullet
 - gradSim (TODO)
-
-I provide scripts for training on a high-computing cluster in the ```slurm``` directory and scripts for WandB logging in the  ```wandb``` directory. 
 
 ## Environment 
 The code is developed under the following configurations.
