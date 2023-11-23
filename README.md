@@ -1,88 +1,75 @@
 # Visual De-Animation in PyTorch
 
-This is an unofficial PyTorch implementation of visual de-animation, applied to pool ball simulations.
+This is an unofficial PyTorch implementation of visual de-animation.
 
-All pre-trained models can found at: https://drive.google.com/file/d/1hWRBVxRsVRbzPNV2--Xs0zmU9pRHwBjW/view?usp=share_link 
-
-## Supported models
-We split our models into optical flow, perceptual module, physics module and graphics module. We have provided some pre-configured models in the ```config``` folder.
+## Framework
+The framework is split into optical flow, object representation module, perceptual module and simulation module. Pre-configured models can be found in the ```config``` directory.
 
 Optical Flow:
 - Farneback
 - SpyNet
 
+Object Represenation Module:
+- Concatenated Images
+- Encoder-Decoder Bottleneck (TODO)
+
 Perceptual Module:
-- Resnet18
-- LeNet
+- AlexNet (TODO)
+- GoogleLeNet (TODO)
+- Resnet (Extend)
+- VisionTransformer (TODO)
 
-Physics Module:
-- PyBullet
+Simulation Module:
+- PyBullet (Extend)
+- gradSim (TODO)
 
-Graphics Module:
-- PyBullet (OpenGL)
+I provide scripts for training on a high-computing cluster in the ```slurm``` directory and scripts for WandB logging in the  ```wandb``` directory. 
 
-## Performance:
-
-<table><tbody>
-    <th valign="bottom">Opt. Flow</th>
-    <th valign="bottom">Network</th>
-    <th valign="bottom">Physics</th>
-    <th valign="bottom">Graphics</th>
-    <th valign="bottom">MSE (px)</th>
-    <th valign="bottom">Pos. Pred. (px)</th>
-    <th valign="bottom">Vel. Pred. (px)</th>
-    <th valign="bottom">Inf. Speed (fps)</th>
-    <tr>
-        <td>Farneback</td>
-        <td>ResNet18</td>
-        <td>PyBullet</td>
-        <td>PyBullet</td>
-        <td>TODO</td>
-        <td>TODO</td>
-        <td>TODO</td>
-        <td>TODO</td>
-    </tr>
-    <tr>
-        <td>SpyNet</td>
-        <td>ResNet18</td>
-        <td>PyBullet</td>
-        <td>PyBullet</td>
-        <td>TODO</td>
-        <td>TODO</td>
-        <td>TODO</td>
-        <td>TODO</td>
-    </tr> 
-    <tr>
-        <td>Farneback</td>
-        <td>LeNet</td>
-        <td>PyBullet</td>
-        <td>PyBullet</td>
-        <td>TODO</td>
-        <td>TODO</td>
-        <td>TODO</td>
-        <td>TODO</td>
-    </tr> 
-    <tr>
-        <td>SpyNet</td>
-        <td>LeNet</td>
-        <td>PyBullet</td>
-        <td>PyBullet</td>
-        <td>TODO</td>
-        <td>TODO</td>
-        <td>TODO</td>
-        <td>TODO</td>
-    </tr>
-</tbody></table>
-
-The training is benchmarked with a single Nvidia GTX 1060  (6GB GPU Memory), the inference speed is benchmarked without visualization.
-
-## Environment
+## Environment 
 The code is developed under the following configurations.
-- Hardware: >=1 GPUs for training, >=1 GPU for testing (set ```[--gpus GPUS]``` accordingly)
-- Software: Ubuntu 20.04.6 LTS, ***CUDA=11, Python=3.8.10, PyTorch=1.13.1***
-- Dependencies: numpy, pybullet, torch, torchvision, Pillow, opencv-python, pandas, matplotlib, tqdm, yacs
 
-## Training
+- Hardware: >=1 GPUs for training, >=1 GPU for testing (set [--gpus GPUS] accordingly)
+- Software: Ubuntu 20.04.6 LTS, CUDA=11.7, Python=3.8.10
+- Dependencies: torch, torchvision, numpy, matplotlib, Pillow, pandas, tqdm, pybullet, opencv-python, wandb, yacs
+
+
+## Installation
+### Pip
+```bash
+pip install git+https://github.com/J0HNN7G/vda.git
+```
+
+### Conda
+
+
+```
+conda create -n vda
+conda activate vda
+
+# pytorch (change to desired version)
+conda install pytorch==2.0.0 torchvision==0.15.0 pytorch-cuda=11.7 -c pytorch -c nvidia
+
+# data processing
+conda install numpy matplotlib Pillow pandas tqdm
+
+# not on conda
+pip install pybullet opencv-python wandb yacs --upgrade-strategy only-if-needed
+
+# vda
+git clone git@github.com:J0HNN7G/vda.git
+cd vda
+python setup.py install
+```
+
+Once installed the package can be consumed programmatically
+```python
+from vda.config import cfg
+from vda.models import PerceptualBuilder
+```
+
+## Tutorial
+We apply the package to system identification on billiards.
+### Training
 1. Generate the pool ball data. 
 ```bash
 cd data/
@@ -115,7 +102,7 @@ chmod +x train.sh
 
 3. You can also override options in commandline, for example  ```python3 train.py TRAIN.num_epoch 10 ```.
 
-## Testing
+### Testing
 
 To test a model on a folder of various image sequences (```$PATH_IMG```), you can simply do the following:
 ```bash
@@ -144,7 +131,7 @@ python3 eval.py --gpus GPUS --cfg config/predict_friction-farneback-resnet18-pyb
 Remember to make sure buffer size is equal to what the model was trained for. By default ```$PATH_IMG = examples```
 and will output predictions to folder ```results```.
 
-## Evaluation
+### Evaluation
 1. Evaluate a trained model on the validation set. Evaluations are by default saved in folder ```ckpt```.
 
 For example:
@@ -165,19 +152,6 @@ chmod +x eval.sh
 ./eval.sh
 ```
 
-## Integration with other projects
-This library can be installed via `pip` to easily integrate with another codebase
-```bash
-pip install git+https://github.com/J0HNN7G/intuitive_physics.git
-```
-
-Now this library can easily be consumed programmatically. For example
-```python
-from vda.config import cfg
-from vda.dataset import TestDataset
-from vda.models import ModelBuilder, PerceptualModule
-```
-
 ## Reference
 
 If you find the code and data generation useful, please cite the following paper and this GitHub Repository:
@@ -193,8 +167,8 @@ Learning to See Physics via Visual De-animation. J. Wu, E. Lu, P. Kohli, W. Free
         }
 
     [2] @misc{frennert2023vda,
-             title = {A Reimplementation of Visual De-Animation Using PyTorch},
+             title = {An implementation of Visual De-Animation Using PyTorch},
              author = {Jonathan Gustafsson Frennert},
-             howpublished = {\url{https://github.com/J0HNN7G/intuitive_physics}}
+             howpublished = {\url{https://github.com/J0HNN7G/vda}}
              year = {2023},
         }

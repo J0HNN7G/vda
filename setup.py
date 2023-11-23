@@ -5,13 +5,13 @@ with open('README.md', 'r') as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name='intuitive_physics',
+    name='vda',
     version='1.0.0',
     author='Jonathan Gustafsson Frennert',
-    description='Data generation, training, testing and validation for non-prehensile manipulation of pool balls using visual de-animation',
+    description='Unofficial Implementation of Visual De-Animation',
     long_description=long_description,
     long_description_content_type='text/markdown',
-    url='https://github.com/J0HNN7G/intuitive_physics',
+    url='https://github.com/J0HNN7G/vda',
     packages=setuptools.find_packages(),
     classifiers=(
         'Programming Language :: Python :: 3',
@@ -19,15 +19,16 @@ setuptools.setup(
         'Operating System :: OS Independent',
     ),
     install_requires=[
-        'numpy',
-        'pybullet',
         'torch',
-        'torchvision',
-        'Pillow',
-        'opencv-python'
-        'pandas',
+        'torchvision',  
+        'numpy',
         'matplotlib',
+        'Pillow',
+        'pandas',
         'tqdm',
+        'pybullet',
+        'opencv-python'
+        'wandb',
         'yacs'
     ]
 )
